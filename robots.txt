@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://bambaclubpizzero.com.ar/sitemap.xml

@@ -1,0 +1,11 @@
+{
+  "name": "Bamba Club Pizzero",
+  "short_name": "Bamba",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FFFBF3",
+  "theme_color": "#A2241F",
+  "icons": [
+    { "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}
