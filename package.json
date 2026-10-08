@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",
-    "deploy": "wrangler deploy"
+    "deploy": "wrangler deploy",
+    "deploy:mockup": "wrangler deploy --name bamba-club-mockup"
   },
   "devDependencies": {
     "wrangler": "^4.149.0"
