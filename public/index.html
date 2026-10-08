@@ -357,6 +357,25 @@ a{color:var(--rojo);text-decoration:none}
 .ticket__acc button{color:var(--gris)}
 .ticket__acc button[data-seguro]{background:var(--rojo);color:#fff}
 
+/* ---------- club bamba ---------- */
+.clubsec{position:relative;margin:0 18px 8px;background:var(--rojo);border-radius:20px;color:var(--crema);overflow:hidden;scroll-margin-top:80px}
+.clubsec__in{position:relative;padding:22px 18px 18px}
+.clubsec__sello{position:absolute;right:14px;top:11px;border:2px solid currentColor;border-radius:50%;padding:4px 12px;font-family:var(--display);font-size:11.5px;transform:rotate(-6deg)}
+.clubsec__eyebrow{color:#FFD3CE}
+.clubsec__tit{font-size:30px;margin:4px 0 8px}
+.clubsec__txt{font-size:13.5px;opacity:.95;max-width:34ch}
+.clubsec__premios{display:flex;flex-wrap:wrap;gap:7px;margin-top:14px}
+.clubsec__premios:empty{display:none}
+.clubsec__premios span{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.3);border-radius:999px;padding:6px 11px;font-size:11.5px;font-weight:700}
+.clubsec__premios b{font-family:var(--display);font-weight:400;margin-right:5px}
+.clubsec__acc{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:16px}
+.clubsec__acc a{display:block;text-align:center;border-radius:11px;padding:13px 8px;font-size:12.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase}
+.clubsec__acc .c1{background:var(--crema);color:var(--rojo);box-shadow:0 3px 0 rgba(0,0,0,.3)}
+.clubsec__acc .c2{background:rgba(0,0,0,.22);color:#fff}
+.socio-box{background:var(--azul-suave);border-radius:14px;padding:12px 13px;font-size:12.5px;line-height:1.4;color:var(--azul-hondo)}
+.socio-box .opciones{margin-bottom:9px}
+.socio-box a{font-weight:800;color:var(--azul);text-decoration:underline}
+
 /* ---------- visitarnos ---------- */
 .local{background:var(--papel);border:1.5px solid var(--linea);border-radius:18px;overflow:hidden}
 .local__in{padding:17px}
@@ -697,6 +716,22 @@ body.splash-activo{overflow:hidden}
     </form>
   </section>
 
+  <!-- CLUB BAMBA -->
+  <section class="clubsec" id="club">
+    <div class="grano"></div>
+    <div class="clubsec__in">
+      <span class="clubsec__sello" aria-hidden="true">SOCIOS</span>
+      <p class="eyebrow clubsec__eyebrow">Sumá puntos</p>
+      <h2 class="display clubsec__tit">CLUB BAMBA</h2>
+      <p class="clubsec__txt" data-club-txt>Con cada pedido sumás puntos para canjear por pizzas, postres y birras.</p>
+      <div class="clubsec__premios" data-club-premios></div>
+      <div class="clubsec__acc" data-club-acc>
+        <a class="c1" href="https://wa.me/5491138693024?text=%C2%A1Hola!%20Quiero%20hacerme%20socio%20del%20Club%20Bamba." target="_blank" rel="noopener">Quiero ser socio</a>
+        <a class="c2" href="/club/">Ya soy socio</a>
+      </div>
+    </div>
+  </section>
+
   <!-- VISITARNOS -->
   <section class="sec" id="donde" style="padding-bottom:32px">
     <div class="enc">
@@ -909,6 +944,14 @@ const datosForm = { nombre:'', tel:'', hora:'', nota:'' };
 let errorMsg = '';
 let checkout = false;
 let modo = MODOS[0], pago = PAGOS[0], pax = 2;
+
+/* Club Bamba: si en este celular se abrió la credencial de un socio, el pedido puede ir a su nombre y sumar puntos. */
+const LS_SOCIO = 'bamba_socio';
+let socio = null;
+try { socio = JSON.parse(localStorage.getItem(LS_SOCIO)); } catch (e) {}
+if (!socio || !socio.token) socio = null;
+let comoSocio = !!socio;
+let pesosPorPunto = 1000;
 
 const $  = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
@@ -1206,8 +1249,20 @@ function pintarPedido() {
         </div>`).join('')}
     </div>`;
 
+  const puntosPedido = Math.floor(total() / pesosPorPunto);
+  const bloqueSocio = socio ? `
+      <div class="socio-box">
+        <div class="opciones">
+          <button class="chip" type="button" data-como="socio" aria-selected="${comoSocio}">Como socio Nº ${esc(socio.numeroTxt)}</button>
+          <button class="chip" type="button" data-como="invitado" aria-selected="${!comoSocio}">Como invitado</button>
+        </div>
+        ${comoSocio ? `Este pedido le suma <b>${puntosPedido} ${puntosPedido === 1 ? 'punto' : 'puntos'}</b> a ${esc(socio.nombre)} cuando lo entreguemos.` : 'Pedís sin sumar puntos del Club.'}
+      </div>` : `
+      <div class="socio-box">¿Sos socio del Club Bamba? <a href="/club/">Abrí tu credencial</a> en este celular y sumá puntos con este pedido.</div>`;
+
   const datos = !checkout ? '' : `
     <div style="margin-top:18px;display:flex;flex-direction:column;gap:15px">
+      ${bloqueSocio}
       <div>
         <p class="bloque__rot">¿Cómo lo querés?</p>
         <div class="opciones">
@@ -1262,7 +1317,9 @@ function enviarPedido() {
   L.push('*Teléfono:* ' + datosForm.tel);
   L.push('*Modalidad:* ' + modo);
   if (datosForm.hora) L.push('*Horario deseado:* ' + datosForm.hora);
-  L.push('*Pago:* ' + pago, '', '*PEDIDO*');
+  L.push('*Pago:* ' + pago);
+  if (comoSocio && socio) L.push('*Socio Club Bamba:* Nº ' + socio.numeroTxt);
+  L.push('', '*PEDIDO*');
   cart.forEach(l => {
     L.push('• ' + l.qty + 'x ' + l.name + (l.variant ? ' (' + l.variant + ')' : '') + ' — ' + plata(l.unit * l.qty));
     if (l.sacar && l.sacar.length) L.push('   SACAR: ' + l.sacar.join(', ') + ' (mismo precio)');
@@ -1284,9 +1341,37 @@ function registrarPedido() {
   try {
     fetch('/api/pedidos', {
       method:'POST', keepalive:true, headers:{ 'content-type':'application/json' },
-      body:JSON.stringify({ ref:refPedido, nombre:datosForm.nombre, tel:datosForm.tel, modo, pago, horario:datosForm.hora,
+      body:JSON.stringify({ ref:refPedido, socio:comoSocio && socio ? socio.token : undefined,
+        nombre:datosForm.nombre, tel:datosForm.tel, modo, pago, horario:datosForm.hora,
         nota:datosForm.nota, items:cart.map(l => ({ name:l.name, variant:l.variant, sacar:(l.sacar || []).join(', '), nota:l.nota, qty:l.qty, unit:l.unit })) }),
     }).catch(() => {});
+  } catch (e) {}
+}
+
+/* ══════════════════════════════════════════════════════════
+   CLUB BAMBA
+   La sección del sitio muestra el programa (premios de /api/club/info).
+   Si en este celular hay una credencial abierta, saluda al socio y el
+   pedido sale a su nombre (o como invitado, si lo elige).
+   ══════════════════════════════════════════════════════════ */
+function llenarConSocio() {
+  if (!socio) return;
+  if (!datosForm.nombre.trim()) datosForm.nombre = socio.nombre || '';
+  if (!datosForm.tel.trim()) datosForm.tel = socio.tel || '';
+}
+async function iniciarClub() {
+  if (socio) {
+    $('[data-club-txt]').innerHTML = `Hola, <b>${esc(String(socio.nombre || '').split(' ')[0])}</b>. Sos el socio Nº ${esc(socio.numeroTxt)}: tus pedidos desde esta web suman puntos.`;
+    $('[data-club-acc]').innerHTML = `<a class="c1" href="/club/${encodeURIComponent(socio.token)}/">Ver mi credencial</a><a class="c2" href="#carta">Pedir y sumar</a>`;
+  }
+  if (!/^https?:$/.test(location.protocol)) return;
+  try {
+    const r = await fetch('/api/club/info');
+    const d = await r.json();
+    if (!d.ok) return;
+    pesosPorPunto = d.pesosPorPunto || pesosPorPunto;
+    $('[data-club-premios]').innerHTML = (d.premios || []).slice().sort((a, b) => a.puntos - b.puntos).slice(0, 4)
+      .map(p => `<span><b>${p.puntos}</b>${esc(p.nombre)}</span>`).join('');
   } catch (e) {}
 }
 
@@ -1365,10 +1450,16 @@ document.addEventListener('click', ev => {
     return;
   }
   if ((el = cerca('[data-pago]'))) { pago = el.dataset.pago; pintarPedido(); return; }
+  if ((el = cerca('[data-como]'))) {
+    comoSocio = el.dataset.como === 'socio';
+    refPedido = null;   // si cambia, es otro registro del pedido
+    if (comoSocio) llenarConSocio();
+    pintarPedido(); return;
+  }
   if (cerca('[data-pedido-volver]')) { checkout = false; errorMsg = ''; pintarPedido(); return; }
   if (cerca('[data-pedido-principal]')) {
     if (checkout) enviarPedido();
-    else { checkout = true; errorMsg = ''; pintarPedido(); $('[data-pedido-cuerpo]').scrollTop = 0; }
+    else { checkout = true; errorMsg = ''; if (comoSocio) llenarConSocio(); pintarPedido(); $('[data-pedido-cuerpo]').scrollTop = 0; }
     return;
   }
 
@@ -2000,6 +2091,7 @@ pintarEstado();
 pintarBarra();
 iniciarSplash();
 observarReservas();
+iniciarClub();
 window.addEventListener('scroll', spy, { passive:true });
 setInterval(pintarEstado, 60000);
 })();
