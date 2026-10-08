@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Club Bamba — Bamba Club Pizzero</title>
+<meta name="description" content="El club de socios de Bamba Club Pizzero: sumá puntos con cada pedido y canjealos por pizzas, postres y birras.">
+<meta name="referrer" content="no-referrer">
+<meta name="theme-color" content="#A2241F">
+<meta name="color-scheme" content="light">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Club Bamba">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/club/marca.css">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{background:var(--rojo-hondo);font-family:var(--texto);color:var(--tinta);font-size:15px;line-height:1.45;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;border:none;background:none;cursor:pointer}
+a{color:inherit}
+[hidden]{display:none!important}
+:focus-visible{outline:3px solid var(--azul);outline-offset:2px;border-radius:4px}
+.app{max-width:520px;margin:0 auto;min-height:100vh;background:var(--crema);box-shadow:0 0 70px rgba(0,0,0,.5);padding-bottom:calc(30px + env(safe-area-inset-bottom))}
+.display{font-family:var(--display);font-weight:400;line-height:.98}
+.eyebrow{font-size:10.5px;font-weight:800;letter-spacing:.16em;text-transform:uppercase}
+.marca,.club{display:block;background:currentColor;-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;-webkit-mask-position:center;mask-position:center;-webkit-mask-size:100% 100%;mask-size:100% 100%}
+.marca{aspect-ratio:5.128;-webkit-mask-image:var(--m-bamba);mask-image:var(--m-bamba)}
+.club{aspect-ratio:10;-webkit-mask-image:var(--m-club);mask-image:var(--m-club)}
+.grano{position:absolute;inset:0;opacity:.45;mix-blend-mode:overlay;pointer-events:none;border-radius:inherit;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+/* cabecera */
+.top{position:sticky;top:0;z-index:20;background:var(--rojo);color:var(--crema);display:flex;align-items:center;justify-content:space-between;gap:10px;height:56px;padding:0 16px;padding-top:env(safe-area-inset-top);box-sizing:content-box;border-bottom:3px solid var(--rojo-osc)}
+.top a{display:block;width:84px;color:var(--crema)}
+.top__club{font-family:var(--display);font-size:15px;letter-spacing:.04em;border:2px solid currentColor;border-radius:50%;padding:3px 12px;transform:rotate(-4deg)}
+
+/* tarjeta (credencial) */
+.cred{padding:18px 16px 4px;background:linear-gradient(var(--rojo) 0 70px,var(--crema) 70px)}
+.tarjeta{position:relative;border-radius:22px;background:radial-gradient(120% 90% at 0% 0%,#B8302A,var(--rojo) 55%,var(--rojo-osc));color:var(--crema);padding:18px 18px 16px;box-shadow:0 14px 34px rgba(92,3,0,.35),0 2px 0 rgba(0,0,0,.2);overflow:hidden}
+.tarjeta__cab{position:relative;display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.tarjeta__lock{width:118px}
+.tarjeta__lock .club{width:63%;margin:5.4% auto 0}
+.sello{border:2.5px solid currentColor;border-radius:50%;padding:6px 14px;font-family:var(--display);font-size:13px;line-height:1.05;text-align:center;transform:rotate(-5deg);white-space:nowrap}
+.tarjeta__qr{position:relative;margin:16px auto 4px;width:min(64vw,236px);background:#fff;border-radius:16px;padding:14px;box-shadow:0 3px 0 rgba(0,0,0,.25)}
+.tarjeta__qr svg{display:block;width:100%;height:auto}
+.tarjeta__qr small{display:block;text-align:center;font-size:10.5px;font-weight:800;letter-spacing:.14em;color:var(--rojo-osc);margin-top:8px}
+.tarjeta__pie{position:relative;display:flex;align-items:flex-end;justify-content:space-between;gap:10px;margin-top:12px}
+.tarjeta__nom{font-family:var(--display);font-size:22px;line-height:1.05;overflow-wrap:anywhere}
+.tarjeta__num{font-size:12px;font-weight:700;letter-spacing:.1em;opacity:.85;margin-top:3px}
+.tarjeta__desde{font-size:10px;font-weight:800;letter-spacing:.12em;opacity:.7;text-align:right;white-space:nowrap}
+
+/* puntos */
+.puntos{margin:16px 16px 0;background:var(--papel);border:1.5px solid var(--linea);border-radius:18px;padding:16px}
+.puntos__fila{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.puntos__n{font-family:var(--display);font-size:46px;line-height:1;color:var(--azul)}
+.puntos__n small{font-family:var(--texto);font-size:13px;font-weight:800;letter-spacing:.12em;color:var(--gris);margin-left:6px}
+.puntos__regla{font-size:12px;color:var(--gris);text-align:right;max-width:16ch}
+.barra{height:10px;border-radius:99px;background:var(--linea);overflow:hidden;margin-top:12px}
+.barra i{display:block;height:100%;border-radius:99px;background:var(--azul);transition:width .6s ease}
+.puntos__meta{font-size:13px;margin-top:8px}
+.puntos__meta b{color:var(--rojo)}
+
+/* acciones */
+.acciones{display:flex;flex-direction:column;gap:9px;margin:14px 16px 0}
+.btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;border-radius:13px;padding:15px 14px;font-size:13.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;text-decoration:none;text-align:center}
+.btn--rojo{background:var(--rojo);color:#fff;box-shadow:0 3px 0 var(--rojo-osc)}
+.btn--azul{background:var(--azul);color:#fff;box-shadow:0 3px 0 var(--azul-hondo)}
+.btn--gw{background:#1F1F1F;color:#fff;text-transform:none;letter-spacing:0;font-size:15px;font-weight:700;box-shadow:0 3px 0 #000}
+.btn--gw svg{width:22px;height:22px;flex:none}
+.btn--claro{background:var(--papel);color:var(--tinta);border:1.5px solid var(--linea)}
+.btn--wa{background:#25D366;color:#0A2E1A}
+.ayuda{background:var(--papel);border:1.5px solid var(--linea);border-radius:14px;overflow:hidden}
+.ayuda summary{list-style:none;cursor:pointer;padding:14px 16px;font-size:13.5px;font-weight:800;display:flex;justify-content:space-between;align-items:center;gap:10px}
+.ayuda summary::-webkit-details-marker{display:none}
+.ayuda summary::after{content:"+";font-size:20px;color:var(--rojo);line-height:1}
+.ayuda[open] summary::after{content:"−"}
+.ayuda__cuerpo{padding:0 16px 16px;font-size:13px;color:var(--gris)}
+.ayuda__cuerpo ol{padding-left:18px;display:flex;flex-direction:column;gap:5px;margin:4px 0 12px}
+.ayuda__cuerpo b{color:var(--tinta)}
+
+/* secciones */
+.sec{margin:26px 16px 0}
+.sec__tit{font-family:var(--display);font-size:24px;color:var(--rojo);margin-bottom:10px;display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.sec__tit small{font-family:var(--texto);font-size:11.5px;font-weight:700;color:var(--gris)}
+.lista{display:flex;flex-direction:column;gap:8px}
+.premio{display:flex;align-items:center;gap:12px;background:var(--papel);border:1.5px solid var(--linea);border-radius:14px;padding:12px 14px}
+.premio__pts{flex:none;min-width:62px;text-align:center;font-family:var(--display);font-size:20px;line-height:1;color:var(--azul)}
+.premio__pts small{display:block;font-family:var(--texto);font-size:9.5px;font-weight:800;letter-spacing:.12em;color:var(--gris);margin-top:3px}
+.premio__nom{font-weight:700;font-size:14px;line-height:1.25}
+.premio__est{font-size:11.5px;color:var(--gris);margin-top:2px}
+.premio--ok{border-color:#9ED9B7;background:#F0FAF4}
+.premio--ok .premio__est{color:#147041;font-weight:700}
+.beneficio{display:flex;gap:10px;align-items:flex-start;font-size:14px;background:var(--papel);border:1.5px solid var(--linea);border-radius:14px;padding:12px 14px}
+.beneficio::before{content:"✷";color:var(--rojo);font-weight:800}
+.mov{display:flex;justify-content:space-between;gap:10px;padding:10px 2px;border-bottom:1px dashed var(--linea);font-size:13.5px}
+.mov small{display:block;color:var(--gris);font-size:11.5px}
+.mov b{font-variant-numeric:tabular-nums;white-space:nowrap}
+.mov b.mas{color:#147041}
+.mov b.menos{color:var(--rojo)}
+.vacio{font-size:13px;color:var(--gris);padding:6px 2px}
+.aviso{margin:12px 16px 0;border-radius:12px;padding:10px 13px;font-size:12.5px;font-weight:600;background:#FFF4CC;color:#5A4200}
+.pie{margin:30px 16px 0;text-align:center;font-size:12px;color:var(--gris)}
+.pie button{text-decoration:underline;font-size:12px;color:var(--gris);padding:6px}
+
+/* portada (sin credencial) */
+.portada{position:relative;background:var(--rojo);color:var(--crema);text-align:center;padding:40px 22px 34px;overflow:hidden}
+.portada__lock{width:min(70%,260px);margin:0 auto}
+.portada__lock .club{width:63%;margin:5.4% auto 0}
+.portada__sello{display:inline-block;margin:22px 0 14px;font-size:20px;padding:10px 24px}
+.portada p{font-size:14.5px;max-width:34ch;margin:0 auto;opacity:.95}
+.carga{padding:60px 20px;text-align:center;color:var(--gris)}
+
+/* hoja de instrucciones */
+.hoja{position:fixed;inset:0;z-index:50;display:flex;align-items:flex-end;justify-content:center;background:rgba(10,10,10,.6)}
+.hoja__caja{width:100%;max-width:520px;background:var(--crema);border-radius:22px 22px 0 0;padding:20px 18px calc(20px + env(safe-area-inset-bottom));font-size:14px}
+.hoja__caja h2{font-family:var(--display);font-weight:400;font-size:22px;color:var(--rojo);margin-bottom:10px}
+.hoja__caja ol{padding-left:20px;display:flex;flex-direction:column;gap:6px;margin-bottom:16px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <a class="marca" href="/" aria-label="Bamba Club Pizzero, ir al sitio"></a>
+    <span class="top__club">CLUB</span>
+  </header>
+  <main data-vista><p class="carga">Cargando…</p></main>
+</div>
+<div class="hoja" data-hoja hidden role="dialog" aria-modal="true"><div class="hoja__caja" data-hoja-caja></div></div>
+
+<script src="/club/qrcode.js"></script>
+<script>
+(() => {
+'use strict';
+const WA = '5491138693024';
+const LS_SOCIO = 'bamba_socio';              // lo lee también la carta, para pedir como socio
+const $ = (s, r = document) => r.querySelector(s);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+const plata = n => '$ ' + Number(n || 0).toLocaleString('es-AR');
+const MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+const fecha = ts => { const d = new Date(ts - 3 * 3600 * 1000); return d.getUTCDate() + ' ' + MESES[d.getUTCMonth()] + ' ' + d.getUTCFullYear(); };
+const fechaHora = ts => { const d = new Date(ts - 3 * 3600 * 1000); return d.getUTCDate() + '/' + (d.getUTCMonth() + 1) + ' ' + String(d.getUTCHours()).padStart(2, '0') + ':' + String(d.getUTCMinutes()).padStart(2, '0'); };
+const leer = k => { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } };
+const guardar = (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
+const esIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const esAndroid = /Android/.test(navigator.userAgent);
+const instalada = matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+
+// el link secreto va en la dirección: /club/<token>/
+const TOKEN = (location.pathname.match(/^\/club\/([A-Za-z0-9_-]{20,64})\/?$/) || [])[1] || null;
+const LS_DATOS = TOKEN ? 'bamba_club_' + TOKEN : null;
+
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('/club/sw.js', { scope: '/club/' }).catch(() => {});
+
+let instalar = null;   // evento de Android/Chrome para "Instalar app"
+addEventListener('beforeinstallprompt', ev => { ev.preventDefault(); instalar = ev; const b = $('[data-instalar]'); if (b) b.hidden = false; });
+
+/* ══════════════ QR ══════════════ */
+function qrDe(texto) { const q = qrcode(0, 'M'); q.addData(texto); q.make(); return q; }
+const svgQR = texto => qrDe(texto).createSvgTag({ cellSize: 8, margin: 0, scalable: true, alt: 'Código QR de socio' });
+
+/* Imagen de la credencial (para guardarla en fotos o armar el pase de Wallet en iPhone). */
+function descargarImagen(s) {
+  const q = qrDe(s.qr), n = q.getModuleCount(), celda = 14, borde = 56, ancho = n * celda + borde * 2, alto = ancho + 150;
+  const c = document.createElement('canvas'); c.width = ancho; c.height = alto;
+  const x = c.getContext('2d');
+  x.fillStyle = '#A2241F'; x.fillRect(0, 0, ancho, alto);
+  x.fillStyle = '#FFFFFF'; x.fillRect(borde - 20, borde - 20, n * celda + 40, n * celda + 40);
+  x.fillStyle = '#141414';
+  for (let r = 0; r < n; r++) for (let k = 0; k < n; k++) if (q.isDark(r, k)) x.fillRect(borde + k * celda, borde + r * celda, celda, celda);
+  x.fillStyle = '#FFFBF3'; x.textAlign = 'center';
+  x.font = '400 46px "Alfa Slab One", Georgia, serif'; x.fillText('CLUB BAMBA', ancho / 2, ancho + 52);
+  x.font = '700 30px "Bricolage Grotesque", sans-serif'; x.fillText(s.nombre + ' · Nº ' + s.numeroTxt, ancho / 2, ancho + 100);
+  const a = document.createElement('a');
+  a.href = c.toDataURL('image/png'); a.download = 'credencial-club-bamba-' + s.numeroTxt + '.png';
+  document.body.appendChild(a); a.click(); a.remove();
+}
+
+/* ══════════════ vistas ══════════════ */
+const iconoGW = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="3" fill="#4285F4"/><rect x="2" y="9" width="20" height="10" rx="3" fill="#34A853"/><rect x="2" y="13" width="20" height="6" rx="3" fill="#FBBC04"/><rect x="2" y="16" width="20" height="3" rx="1.5" fill="#EA4335"/></svg>';
+
+function pintarCredencial(d, sinConexion) {
+  const s = d.socio, premios = (d.premios || []).slice().sort((a, b) => a.puntos - b.puntos);
+  const prox = premios.find(p => p.puntos > s.puntos);
+  const base = premios.filter(p => p.puntos <= s.puntos).pop();
+  const pct = prox ? Math.max(4, Math.min(100, (s.puntos - (base ? base.puntos : 0)) / (prox.puntos - (base ? base.puntos : 0)) * 100)) : 100;
+  const meta = prox ? `Te faltan <b>${prox.puntos - s.puntos}</b> para <b>${esc(prox.nombre)}</b>.` : premios.length ? '¡Ya podés canjear cualquier premio!' : '';
+  const google = d.wallet && d.wallet.google;
+
+  $('[data-vista]').innerHTML = `
+    <section class="cred">
+      <div class="tarjeta">
+        <div class="grano"></div>
+        <div class="tarjeta__cab">
+          <div class="tarjeta__lock" aria-label="Bamba Club Pizzero"><span class="marca"></span><span class="club"></span></div>
+          <span class="sello">SOCIO<br>DEL CLUB</span>
+        </div>
+        <div class="tarjeta__qr">${svgQR(s.qr)}<small>MOSTRALO AL PAGAR</small></div>
+        <div class="tarjeta__pie">
+          <div><p class="tarjeta__nom">${esc(s.nombre)}</p><p class="tarjeta__num">SOCIO Nº ${esc(s.numeroTxt)}</p></div>
+          <p class="tarjeta__desde">DESDE<br>${esc(fecha(s.desde).toUpperCase())}</p>
+        </div>
+      </div>
+    </section>
+    ${sinConexion ? `<p class="aviso">Sin conexión: puntos al ${esc(fechaHora(sinConexion))}. El QR sirve igual.</p>` : ''}
+
+    <section class="puntos" aria-label="Tus puntos">
+      <div class="puntos__fila">
+        <p class="puntos__n">${s.puntos}<small>PUNTOS</small></p>
+        <p class="puntos__regla">1 punto cada ${plata(d.pesosPorPunto)} de compra</p>
+      </div>
+      ${premios.length ? `<div class="barra" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(pct)}"><i style="width:${pct}%"></i></div>
+      <p class="puntos__meta">${meta}</p>` : ''}
+    </section>
+
+    <div class="acciones">
+      ${google ? `<a class="btn btn--gw" href="${esc(google)}" target="_blank" rel="noopener">${iconoGW}Agregar a Google Wallet</a>` : ''}
+      ${instalada ? '' : `<button class="btn btn--azul" type="button" data-instalar${esIOS || esAndroid || instalar ? '' : ' hidden'}>Guardar en la pantalla de inicio</button>`}
+      <a class="btn btn--rojo" href="/#carta">Pedir con mi credencial</a>
+      ${!google || esIOS ? `
+      <details class="ayuda"${esIOS ? ' open' : ''}>
+        <summary>${esIOS ? 'Sumala a Apple Wallet' : 'Tenerla en la billetera del celular'}</summary>
+        <div class="ayuda__cuerpo">
+          <p><b>iPhone con iOS 27:</b> la app Wallet arma la tarjeta con tu QR.</p>
+          <ol>
+            <li>Tocá <b>Guardar imagen</b> acá abajo.</li>
+            <li>Abrí <b>Wallet</b>, tocá <b>+</b> y elegí <b>Crear pase</b>.</li>
+            <li>Elegí la plantilla <b>Membresía</b> y escaneá el QR de la imagen (o elegí la foto).</li>
+          </ol>
+          ${!google ? '<p style="margin-bottom:12px"><b>Android:</b> muy pronto vas a poder sumarla a Google Wallet con un botón. Mientras tanto guardala en la pantalla de inicio.</p>' : ''}
+          <p style="margin-bottom:12px">El pase de Wallet muestra tu QR; los puntos al día los ves siempre acá.</p>
+          <button class="btn btn--claro" type="button" data-imagen>Guardar imagen</button>
+        </div>
+      </details>` : ''}
+    </div>
+
+    <section class="sec">
+      <h2 class="sec__tit">PREMIOS <small>se canjean en el local</small></h2>
+      <div class="lista">${premios.map(p => {
+        const ok = p.puntos <= s.puntos;
+        return `<div class="premio${ok ? ' premio--ok' : ''}"><p class="premio__pts">${p.puntos}<small>PUNTOS</small></p>
+          <div><p class="premio__nom">${esc(p.nombre)}</p><p class="premio__est">${ok ? '¡Ya lo podés canjear! Pedilo al pagar.' : 'Te faltan ' + (p.puntos - s.puntos) + ' puntos'}</p></div></div>`;
+      }).join('') || '<p class="vacio">Pronto vas a ver los premios acá.</p>'}</div>
+    </section>
+
+    ${(d.beneficios || []).length ? `<section class="sec">
+      <h2 class="sec__tit">BENEFICIOS</h2>
+      <div class="lista">${d.beneficios.map(b => `<p class="beneficio">${esc(b)}</p>`).join('')}</div>
+    </section>` : ''}
+
+    <section class="sec">
+      <h2 class="sec__tit">MOVIMIENTOS</h2>
+      <div>${(d.movimientos || []).map(m => `<div class="mov"><span>${esc(m.detalle)}<small>${esc(fecha(m.creado))}${m.monto ? ' · ' + plata(m.monto) : ''}</small></span>
+        <b class="${m.puntos > 0 ? 'mas' : m.puntos < 0 ? 'menos' : ''}">${m.puntos > 0 ? '+' : ''}${m.puntos}</b></div>`).join('') || '<p class="vacio">Todavía no tenés movimientos. Pedí con tu credencial o mostrá el QR al pagar en el local.</p>'}</div>
+    </section>
+
+    <footer class="pie">
+      <p>Credencial personal de ${esc(s.nombre)}. No la compartas: quien tenga este link ve tus puntos.</p>
+      <button type="button" data-salir>¿No sos vos? Salir de esta credencial</button>
+    </footer>`;
+  document.title = 'Club Bamba — ' + s.nombre;
+}
+
+function pintarPortada(info) {
+  const premios = info ? (info.premios || []).slice().sort((a, b) => a.puntos - b.puntos) : [];
+  $('[data-vista]').innerHTML = `
+    <section class="portada">
+      <div class="grano"></div>
+      <div class="portada__lock" aria-label="Bamba Club Pizzero"><span class="marca"></span><span class="club"></span></div>
+      <p class="sello portada__sello">CLUB BAMBA</p>
+      <p>Sumá puntos con cada pedido y canjealos por pizzas, postres y birras.</p>
+    </section>
+    <div class="acciones" style="margin-top:18px">
+      <a class="btn btn--wa" href="https://wa.me/${WA}?text=${encodeURIComponent('¡Hola! Quiero hacerme socio del Club Bamba.')}" target="_blank" rel="noopener">Quiero ser socio</a>
+      <p style="font-size:12.5px;color:var(--gris);text-align:center">Te damos de alta en el local o por WhatsApp y te mandamos el link de tu credencial.</p>
+    </div>
+    ${info ? `
+    <section class="sec">
+      <h2 class="sec__tit">CÓMO FUNCIONA</h2>
+      <div class="lista">
+        <p class="beneficio">1 punto cada ${plata(info.pesosPorPunto)}, en pedidos web hechos con tu credencial y en el local mostrando el QR.</p>
+        ${(info.beneficios || []).map(b => `<p class="beneficio">${esc(b)}</p>`).join('')}
+      </div>
+    </section>
+    <section class="sec">
+      <h2 class="sec__tit">PREMIOS</h2>
+      <div class="lista">${premios.map(p => `<div class="premio"><p class="premio__pts">${p.puntos}<small>PUNTOS</small></p><div><p class="premio__nom">${esc(p.nombre)}</p></div></div>`).join('')}</div>
+    </section>` : ''}
+    <footer class="pie"><p>¿Ya sos socio? Abrí el link que te mandamos por WhatsApp.</p></footer>`;
+}
+
+function pintarInvalida() {
+  $('[data-vista]').innerHTML = `
+    <div class="carga">
+      <p class="display" style="font-size:24px;color:var(--rojo);margin-bottom:10px">ESTA CREDENCIAL YA NO ANDA</p>
+      <p>Puede ser que el local te haya mandado un link nuevo. Buscalo en WhatsApp o pedilo de nuevo.</p>
+      <div class="acciones"><a class="btn btn--wa" href="https://wa.me/${WA}?text=${encodeURIComponent('¡Hola! Necesito el link de mi credencial del Club Bamba.')}" target="_blank" rel="noopener">Pedir mi link</a></div>
+    </div>`;
+}
+
+/* ══════════════ arranque ══════════════ */
+let datos = null;
+async function cargar() {
+  if (!TOKEN) {
+    // si en este celular ya hay una credencial, vamos a esa
+    const s = leer(LS_SOCIO);
+    if (s && s.token) { location.replace('/club/' + s.token + '/'); return; }
+    let info = null;
+    try { const r = await fetch('/api/club/info'); if (r.ok) info = await r.json(); } catch (e) {}
+    pintarPortada(info);
+    return;
+  }
+  // manifest propio: "agregar a inicio" abre esta credencial
+  const m = document.createElement('link'); m.rel = 'manifest'; m.href = 'manifest.webmanifest'; document.head.appendChild(m);
+
+  const guardado = leer(LS_DATOS);
+  if (guardado && !datos) pintarCredencial(guardado.d, guardado.ts);   // se ve al toque, aun sin señal
+  try {
+    const r = await fetch('/api/club/yo', { headers: { 'x-socio': TOKEN }, cache: 'no-store' });
+    const j = await r.json().catch(() => null);
+    if (r.status === 404) {
+      guardar(LS_DATOS, null);
+      const s = leer(LS_SOCIO); if (s && s.token === TOKEN) guardar(LS_SOCIO, null);
+      pintarInvalida(); return;
+    }
+    if (!r.ok || !j || !j.ok) throw new Error('red');
+    datos = j;
+    guardar(LS_DATOS, { d: j, ts: Date.now() });
+    guardar(LS_SOCIO, { token: TOKEN, numero: j.socio.numero, numeroTxt: j.socio.numeroTxt, nombre: j.socio.nombre, tel: j.socio.tel });
+    pintarCredencial(j, 0);
+  } catch (e) {
+    if (guardado) pintarCredencial(guardado.d, guardado.ts);
+    else $('[data-vista]').innerHTML = '<p class="carga">No pudimos cargar tu credencial. Revisá la conexión y probá de nuevo.</p>';
+  }
+}
+
+function hoja(html) { $('[data-hoja-caja]').innerHTML = html; $('[data-hoja]').hidden = false; }
+document.addEventListener('click', async ev => {
+  const c = s => ev.target.closest(s);
+  if (c('[data-hoja]') && !c('[data-hoja-caja]') || c('[data-cerrar-hoja]')) { $('[data-hoja]').hidden = true; return; }
+  if (c('[data-imagen]')) { const d = datos || (leer(LS_DATOS) || {}).d; if (d) descargarImagen(d.socio); return; }
+  if (c('[data-instalar]')) {
+    if (instalar) { instalar.prompt(); instalar = null; return; }
+    hoja(esIOS ? `
+      <h2>GUARDALA EN TU IPHONE</h2>
+      <ol><li>Abrí esta página en <b>Safari</b>.</li><li>Tocá el botón <b>Compartir</b> (el cuadrado con la flecha).</li><li>Elegí <b>Agregar a inicio</b>.</li></ol>
+      <button class="btn btn--rojo" type="button" data-cerrar-hoja>Listo</button>` : `
+      <h2>GUARDALA EN TU CELULAR</h2>
+      <ol><li>Abrí el menú del navegador (los tres puntitos).</li><li>Elegí <b>Agregar a la pantalla principal</b> o <b>Instalar app</b>.</li></ol>
+      <button class="btn btn--rojo" type="button" data-cerrar-hoja>Listo</button>`);
+    return;
+  }
+  if (c('[data-salir]')) {
+    guardar(LS_SOCIO, null); guardar(LS_DATOS, null);
+    location.replace('/club/');
+  }
+});
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && TOKEN) cargar(); });
+cargar();
+})();
+</script>
+</body>
+</html>

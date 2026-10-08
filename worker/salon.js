@@ -1,4 +1,5 @@
 import { DurableObject } from "cloudflare:workers";
+import { metodosClub } from "./club.js";
 const TZ_MIN = -180;
 const HOLD_MS = 3 * 60 * 1000;
 const ACTIVAS = "('confirmada','sentada')";
@@ -55,7 +56,7 @@ const CONFIG_BASE = {
     { id: "19", personas: 4, forma: "rect", giro: 0, unible: false, x: 80, y: 71 }
   ]
 };
-class ErrorHttp extends Error {
+export class ErrorHttp extends Error {
   constructor(status, msg, code) {
     super(msg);
     this.status = status;
@@ -87,10 +88,10 @@ function sumarDias(f, n) {
 
 const diaSemana = (f) => (new Date(f + "T00:00:00Z")).getUTCDay();
 const diasEntre = (a, b) => Math.round((Date.parse(b + "T00:00:00Z") - Date.parse(a + "T00:00:00Z")) / 86400000);
-const limpiar = (s, max) => String(s == null ? "" : s).replace(/[\u0000-\u001F\u007F]/g, " ").replace(/\s+/g, " ").trim().slice(0, max);
-const soloTel = (s) => String(s == null ? "" : s).replace(/[^\d+]/g, "");
-const digitos = (s) => String(s == null ? "" : s).replace(/\D/g, "");
-const entero = (v, min, max) => {
+export const limpiar = (s, max) => String(s == null ? "" : s).replace(/[\u0000-\u001F\u007F]/g, " ").replace(/\s+/g, " ").trim().slice(0, max);
+export const soloTel = (s) => String(s == null ? "" : s).replace(/[^\d+]/g, "");
+export const digitos = (s) => String(s == null ? "" : s).replace(/\D/g, "");
+export const entero = (v, min, max) => {
   const n = Number(v);
   return Number.isInteger(n) && n >= min && n <= max ? n : null;
 };
@@ -146,6 +147,7 @@ export class Salon extends DurableObject {
         CREATE INDEX IF NOT EXISTS idx_pedidos_fecha ON pedidos(fecha);
         CREATE TABLE IF NOT EXISTS config (k TEXT PRIMARY KEY, v TEXT NOT NULL);
       `);
+      this.crearTablasClub();
     });
     ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair("ping", "pong"));
   }
@@ -291,7 +293,8 @@ export class Salon extends DurableObject {
       items,
       unidades: p.unidades,
       total: p.total,
-      estado: p.estado
+      estado: p.estado,
+      ...this.clubDePedido(p)
     };
   }
   /* ───────────── topes de uso (RPC desde el Worker) ───────────── */
@@ -378,6 +381,7 @@ export class Salon extends DurableObject {
       if (ruta === "/api/reservas" && m === "POST") return this.rReservar(await this.cuerpo(request));
       if (ruta === "/api/reservas/cancelar" && m === "POST") return this.rCancelarCliente(await this.cuerpo(request));
       if (ruta === "/api/pedidos" && m === "POST") return this.rPedido(await this.cuerpo(request));
+      if (ruta.startsWith("/api/club/")) return await this.rClub(ruta, request, url);
       if (ruta.startsWith("/api/admin/")) {
         const sub = ruta.slice("/api/admin/".length);
         if (sub === "reservas" && m === "GET") return this.aReservas(url);
@@ -396,6 +400,7 @@ export class Salon extends DurableObject {
         if (sub === "salon" && m === "GET") return this.resp({ ok: true, ...this.config(), maxPersonas: this.maxPersonas() });
         if (sub === "salon" && m === "PUT") return this.aGuardarSalon(await this.cuerpo(request));
         if (sub === "export" && m === "GET") return this.aExportar(url);
+        if (sub === "club" || sub.startsWith("socios") || sub.startsWith("movimientos/")) return await this.aClub(sub, request, url);
       }
       throw new ErrorHttp(404, "No existe", "no_existe");
     } catch (e) {
@@ -574,9 +579,11 @@ export class Salon extends DurableObject {
     const unidades = items.reduce((s, i) => s + i.qty, 0);
     const total = items.reduce((s, i) => s + i.qty * i.unit, 0);
     const t = ahoraAR();
+    // pedido hecho con la credencial del Club: queda asociado al socio y suma puntos cuando se entrega
+    const socio = b.socio ? this.socioPorToken(b.socio) : null;
     const fila = this.q(
-      `INSERT INTO pedidos (ref, creado, fecha, hora, nombre, tel, modo, pago, horario, nota, items, unidades, total, estado)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'nuevo') RETURNING *`,
+      `INSERT INTO pedidos (ref, creado, fecha, hora, nombre, tel, modo, pago, horario, nota, items, unidades, total, estado, socio_id)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'nuevo',?) RETURNING *`,
       ref,
       Date.now(),
       t.fecha,
@@ -589,10 +596,11 @@ export class Salon extends DurableObject {
       limpiar(b.nota, 300),
       JSON.stringify(items),
       unidades,
-      total
+      total,
+      socio ? socio.id : null
     )[0];
     this.difundir({ t: "admin", evento: "pedido_nuevo", pedido: this.vistaPedido(fila) }, true);
-    return this.resp({ ok: true, id: fila.id }, 201);
+    return this.resp({ ok: true, id: fila.id, socio: !!socio }, 201);
   }
   /* ════════════════ DUEÑOS ════════════════ */
   rango(url, porDefecto = 30) {
@@ -716,10 +724,12 @@ export class Salon extends DurableObject {
     if (!ESTADOS_PEDIDO.includes(b.estado)) throw new ErrorHttp(400, "Estado inválido", "estado");
     if (!this.q(`SELECT 1 FROM pedidos WHERE id=?`, id).length) throw new ErrorHttp(404, "Pedido inexistente", "no_existe");
     this.sql.exec(`UPDATE pedidos SET estado=? WHERE id=?`, b.estado, id);
+    const aviso = this.acreditarPedido(id); // Club: "entregado" suma los puntos al socio; cualquier otro estado los saca
     this.difundir({ t: "admin", evento: "pedido_editado", id, estado: b.estado }, true);
-    return this.resp({ ok: true });
+    return this.resp({ ok: true, aviso });
   }
   aBorrarPedido(id) {
+    this.quitarPuntosPedido(id);
     this.sql.exec(`DELETE FROM pedidos WHERE id=?`, id);
     this.difundir({ t: "admin", evento: "pedido_borrado", id }, true);
     return this.resp({ ok: true });
@@ -880,3 +890,6 @@ export class Salon extends DurableObject {
     });
   }
 }
+
+// Club Bamba: socios, puntos y premios (worker/club.js)
+Object.assign(Salon.prototype, metodosClub);

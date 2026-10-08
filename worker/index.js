@@ -47,6 +47,17 @@ async function mismaClave(a, b) {
 }
 
 const galleta = (valor, seg, https) => `${COOKIE}=${valor}; Path=/; Max-Age=${seg}; HttpOnly;${https ? " Secure;" : ""} SameSite=Strict`;
+/* Manifest propio de cada credencial: al agregarla a la pantalla de inicio abre directo la del socio. */
+const manifestCredencial = (token) => new Response(JSON.stringify({
+  name: "Club Bamba · Mi credencial",
+  short_name: "Club Bamba",
+  start_url: `/club/${token}/`,
+  scope: `/club/${token}/`,
+  display: "standalone",
+  background_color: "#A2241F",
+  theme_color: "#A2241F",
+  icons: [{ src: "/favicon.svg", sizes: "any", type: "image/svg+xml" }]
+}), { headers: { "content-type": "application/manifest+json", "cache-control": "no-store", "x-robots-tag": "noindex" } });
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -87,6 +98,24 @@ export default {
     }
     if (["/api/salon", "/api/disponibilidad", "/api/reservas", "/api/reservas/cancelar", "/api/pedidos"].includes(ruta)) {
       return salon.fetch(request);
+    }
+    // Club Bamba: datos del programa y de la credencial del socio
+    if (ruta === "/api/club/info") return salon.fetch(request);
+    if (ruta === "/api/club/yo") {
+      if (!await salon.limite("club:" + ip, 120, 600)) return json({ ok: false, error: "Demasiados intentos seguidos. Esperá unos minutos.", code: "tope" }, 429);
+      return salon.fetch(request);
+    }
+    // credencial del socio: /club/<link secreto>/ — la página es la misma para todos, el link identifica al socio
+    const cred = ruta.match(/^\/club\/([A-Za-z0-9_-]{20,64})(\/(manifest\.webmanifest)?)?$/);
+    if (cred && (metodo === "GET" || metodo === "HEAD")) {
+      if (!cred[2]) return Response.redirect(url.origin + ruta + "/", 301);
+      if (cred[3]) return manifestCredencial(cred[1]);
+      const pagina = await env.ASSETS.fetch(new Request(url.origin + "/club/"));
+      const h = new Headers(pagina.headers);
+      h.set("cache-control", "no-store");
+      h.set("referrer-policy", "no-referrer"); // que el link secreto no viaje a otros sitios
+      h.set("x-robots-tag", "noindex");
+      return new Response(pagina.body, { status: pagina.status, headers: h });
     }
     if (!ruta.startsWith("/api/")) {
       return Response.redirect(url.origin + (ruta.startsWith("/admin") ? "/admin/" : "/"), 302);
