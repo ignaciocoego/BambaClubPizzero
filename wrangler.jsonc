@@ -1,0 +1,18 @@
+// Configuración del Worker, reconstruida a partir de lo que tiene Cloudflare
+// (bindings: ASSETS y el Durable Object SALON; migración "v1").
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "bamba-clubpizzero",
+  "main": "worker/index.js",
+  "compatibility_date": "2026-01-15",
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS"
+  },
+  "durable_objects": {
+    "bindings": [{ "name": "SALON", "class_name": "Salon" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Salon"] }],
+  "observability": { "enabled": true },
+  "upload_source_maps": true
+}

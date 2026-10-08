@@ -1,88 +1,61 @@
-# Bamba Club Pizzero — sitio web
+# Bamba Club Pizzero — sitio, reservas y panel
 
-Sitio estático de una sola página. `index.html` es 100% autocontenido: HTML,
-CSS, JS y las dos tipografías (Alfa Slab One y Poppins) van todas adentro del
-mismo archivo, incrustadas en base64. Así se puede subir un solo archivo a
-GitHub / GitHub Pages y se ve igual siempre, con o sin internet, sin
-necesidad de mantener una carpeta `fonts/` al lado.
+Worker de Cloudflare (`bamba-clubpizzero`) que sirve:
 
-Por eso pesa más que un HTML típico (~140 KB): esos KB de más son las
-fuentes. Si en algún momento se quiere aligerar el archivo, se puede volver
-a separar las fuentes en una carpeta `fonts/` y referenciarlas por `url()`
-en vez de `data:` — mismo patrón que usa San Marzano.
+- `/` — el sitio: carta, pedido por WhatsApp, reservas en vivo con el plano del salón.
+- `/admin/` — el panel de los dueños: hoy, reservas, pedidos, números y editor del salón.
+- `/api/*` — la API. Reservas, pedidos y la configuración del salón se guardan en un
+  Durable Object (`SALON`, clase `Salon`) con SQLite.
+
+## De dónde sale esta versión (rama `mockup-club`)
+
+> **Ojo:** esta rama es un mockup armado el 8/10/2026.
+
+- `public/index.html`, `public/admin/index.html` y los archivos chicos de `public/`
+  se bajaron del sitio publicado en `bamba-clubpizzero.steady-python.workers.dev`.
+- El código del Worker (`worker/`) **no** es el de ese sitio: está en otra cuenta de
+  Cloudflare. Se bajó de la copia que hay en la cuenta `ignaciocoego@gmail.com`
+  (publicada el 23/9/2026), que es más vieja. Por ejemplo, no guardaba la opción
+  "se puede juntar" (`unible`) de las mesas que sí usa el HTML.
+- El primer commit de la rama es la copia tal cual se bajó (el bundle de esbuild en
+  `worker/index.js`); el segundo lo separa en las fuentes originales
+  (`worker/index.js` y `worker/salon.js`) sin cambiar comportamiento. El resto de los
+  commits son los cambios, uno por tema, para poder pasarlos a mano al código bueno.
+
+La versión vieja del repo (sitio estático sin backend) quedó en el historial de `main`.
 
 ## Estructura
 
 ```
-index.html        todo el sitio: HTML + CSS + JS + fuentes embebidas
-favicon.svg        ícono simple (círculo rojo, borde azul, "B")
-site.webmanifest   para "agregar a pantalla de inicio"
-robots.txt / sitemap.xml
+public/              archivos estáticos (Workers Static Assets)
+  index.html         sitio (HTML + CSS + JS + fuentes embebidas en base64)
+  admin/index.html   panel de dueños
+worker/
+  index.js           enrutador, login del panel y topes de uso
+  salon.js           Durable Object: reservas, pedidos, salón (SQLite)
+wrangler.jsonc       configuración (bindings ASSETS y SALON)
 ```
 
-No hay carpetas `brand/` ni `img/` todavía: el menú de Bamba
-(`BAMBA_MenúDigital.pdf`) no trae fotos de platos ni un isotipo aparte del
-wordmark "BAMBA", así que el sitio es 100% tipográfico — igual que su propio
-PDF — usando sellos ovalados dibujados en CSS en vez de imágenes.
+## Contraseña del panel
 
-## De dónde salió cada dato
+El login del `/admin/` usa el secreto `ADMIN_PASSWORD`. En Cloudflare se carga con:
 
-- **Menú y precios**: extraídos página por página del PDF `BAMBA_MenúDigital.pdf`
-  (11 páginas reales). Los ítems marcados "opcional frita", "opcional miel" o
-  "opción por porción" en el PDF se armaron como variantes elegibles en la
-  ficha del producto (incluyen el mismo precio, o el precio de la porción,
-  según corresponda).
-- **Colores**: muestreados directo de los renders del PDF (rojo `#A2241F`,
-  azul `#1F3E8C`, crema `#FFFBF3`).
-- **Dirección**: Monseñor Piaggio 98, Avellaneda — de la imagen de story
-  "Mesa chica & buenas pizzas".
-- **Horarios**: del bio de Instagram — martes a viernes 11:30/15:30 y
-  17:30/00:30, sábado y domingo 11:30/00:30, lunes cerrado.
-- **WhatsApp**: `5491138693024`, provisto directamente.
-- **Instagram**: `@bamba.clubpizzero`.
+```bash
+npx wrangler secret put ADMIN_PASSWORD
+```
 
-## Pendiente / a confirmar con el cliente
+Para probar en local, copiá `.dev.vars.example` a `.dev.vars`.
 
-- **Dominio real**: el sitio usa `https://bambaclubpizzero.com.ar/` como
-  placeholder en el `<link rel="canonical">`, Open Graph y JSON-LD. Reemplazar
-  por el dominio definitivo antes de indexar en Google.
-- **Fotos de platos**: no había ninguna en el PDF. Si el cliente manda fotos,
-  se puede agregar una carpeta `img/` y sumar `<img>` dentro de la ficha de
-  cada plato (mismo mecanismo que San Marzano — buscá `ficha__foto` en
-  `index.html` de esa carpeta como referencia) y una galería tipo la de
-  San Marzano si quieren.
-- **Medios de pago**: no confirmados, por eso no se muestran como dato
-  afirmado en el sitio (sí aparecen como opción a elegir dentro del pedido
-  de WhatsApp, pero eso es lo que pide el cliente, no una promesa del local).
+## Probar en local
 
-## Cambiar precios, platos o secciones
-
-Todo está en el bloque `DATOS` dentro de `index.html` (buscá esa línea):
-el array `MENU`. Cada sección tiene `color: 'rojo'` o `'azul'` (así se pinta
-el título y los nombres de los platos, alternando como en el menú real) y
-puede llevar un `badge` (el sello tipo "ESTILO TANO" / "ESTILO ARGENTO").
-
-Los precios van sin puntos ni signos: `18500`, no `$ 18.500`.
-
-## Horarios
-
-El cartel de "Abierto / Cerrado" se calcula en la función `estado()`, con
-los dos turnos de martes a viernes y el horario corrido de sábado a domingo.
-
-## Animación de inicio
-
-Al cargar, se ve un "sello" (BAMBA / CLUB PIZZERO) que golpea contra la
-pantalla roja y se retira, como un sello de tinta. Se desactiva sola si el
-usuario tiene activado "reducir movimiento" en su sistema.
+```bash
+npx wrangler dev
+```
 
 ## Publicar
 
 ```bash
-npx wrangler pages deploy . --project-name=bamba-clubpizzero --branch=main
+npx wrangler deploy
 ```
 
-## Ver el sitio local
-
-```bash
-npx serve .
-```
+Antes de publicar, fijate con `npx wrangler whoami` que estés en la cuenta correcta.

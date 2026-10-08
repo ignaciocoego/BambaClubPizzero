@@ -1,0 +1,2 @@
+# Variables para `wrangler dev` (copiar a .dev.vars). Solo para probar en local.
+ADMIN_PASSWORD=bamba-local
