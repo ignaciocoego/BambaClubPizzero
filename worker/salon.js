@@ -4,22 +4,17 @@ const HOLD_MS = 3 * 60 * 1000;
 const ACTIVAS = "('confirmada','sentada')";
 const ESTADOS_RESERVA = ["confirmada", "sentada", "completada", "cancelada", "no_vino"];
 const ESTADOS_PEDIDO = ["nuevo", "confirmado", "entregado", "cancelado"];
+const SETTINGS_EDITABLES = ["estadiaMin", "diasAdelante", "anticipacionMin", "juntarMax", "juntarDist"];
 const CONFIG_BASE = {
   settings: {
     estadiaMin: 90,
-    // cuánto tiempo ocupa la mesa cada reserva
-    pasoMin: 30,
-    // separación entre horarios
+    // cuánto tiempo ocupa la mesa cada reserva (nunca pasa del turno siguiente: ver finTurno)
     diasAdelante: 30,
     // hasta cuántos días se puede reservar
     anticipacionMin: 30,
     // mínimo de anticipación para reservar
-    cierreMin: 60,
-    // el último horario sale X min antes de cerrar
-    nocheDesde: 1020,
-    // desde las 17:00 no hay horarios cada 30 min: solo los turnos de la noche
-    turnosNoche: [1200, 1290, 1380],
-    // 20:00, 21:30 y 23:00
+    turnos: [1200, 1290],
+    // los únicos horarios de reserva: 20:00 (termina 21:30) y 21:30. No se editan desde el panel.
     juntarMax: 2,
     // cuántas mesas se pueden juntar como máximo (solo las marcadas `unible`)
     juntarCabezales: 2,
@@ -169,8 +164,10 @@ export class Salon extends DurableObject {
         guardada = {};
       }
     }
+    // del salón guardado solo se toman las reglas que se editan en el panel; el resto (turnos) sale del código
+    const editables = Object.fromEntries(Object.entries(guardada.settings || {}).filter(([k, v]) => SETTINGS_EDITABLES.includes(k) && v != null));
     this.cfg = {
-      settings: { ...CONFIG_BASE.settings, ...guardada.settings || {} },
+      settings: { ...CONFIG_BASE.settings, ...editables },
       // los horarios del local salen siempre del código: si quedaron guardados de antes, no pisan los nuevos
       horarios: CONFIG_BASE.horarios,
       mesas: Array.isArray(guardada.mesas) && guardada.mesas.length ? guardada.mesas : CONFIG_BASE.mesas
@@ -181,16 +178,18 @@ export class Salon extends DurableObject {
     this.sql.exec(`INSERT INTO config (k, v) VALUES ('cfg', ?) ON CONFLICT(k) DO UPDATE SET v=excluded.v`, JSON.stringify(cfg));
     this.cfg = null;
   }
-  /* Al mediodía y a la tarde los horarios salen cada 30 min; de noche (desde nocheDesde) solo los turnos fijos. */
+  /* Se reserva solo en los turnos fijos (20:00 y 21:30), los días que el local abre. */
   turnos(fecha) {
-    const c = this.config(), s = c.settings;
+    const c = this.config();
     const intervalos = c.horarios[String(diaSemana(fecha))] || [];
-    const out = new Set();
-    for (const [a, b] of intervalos) {
-      for (let t = a; t <= b - s.cierreMin; t += s.pasoMin) if (t < s.nocheDesde) out.add(t);
-      for (const t of s.turnosNoche) if (t >= a && t <= b - s.cierreMin) out.add(t);
-    }
-    return [...out].sort((x, y) => x - y);
+    return c.settings.turnos.filter((t) => intervalos.some(([a, b]) => t >= a && t < b)).sort((x, y) => x - y);
+  }
+  /* Hasta cuándo ocupa la mesa una reserva: la estadía, pero nunca después de que arranca el turno
+     siguiente. Así el turno de las 20:00 termina a las 21:30 y la mesa queda para el de las 21:30. */
+  finTurno(desde) {
+    const s = this.config().settings;
+    const siguiente = s.turnos.filter((t) => t > desde).sort((x, y) => x - y)[0];
+    return siguiente == null ? desde + s.estadiaMin : Math.min(desde + s.estadiaMin, siguiente);
   }
   maxPersonas() {
     return Math.max(...this.config().mesas.map((m) => m.personas));
@@ -439,7 +438,7 @@ export class Salon extends DurableObject {
       mesas: c.mesas,
       settings: {
         estadiaMin: c.settings.estadiaMin,
-        pasoMin: c.settings.pasoMin,
+        turnos: c.settings.turnos,
         diasAdelante: c.settings.diasAdelante,
         anticipacionMin: c.settings.anticipacionMin,
         juntarMax: c.settings.juntarMax,
@@ -484,7 +483,7 @@ export class Salon extends DurableObject {
       if (!turnos.includes(desde)) throw new ErrorHttp(400, "Ese horario no está disponible", "hora");
       if (fecha === a.fecha && desde < a.min + c.settings.anticipacionMin) throw new ErrorHttp(400, "Ese horario ya pasó o es muy pronto. Escribinos por WhatsApp.", "hora");
     } else if (desde % 5 !== 0) throw new ErrorHttp(400, "Horario inválido", "hora");
-    const hasta = desde + c.settings.estadiaMin;
+    const hasta = this.finTurno(desde);
     const mesas = this.idsDeMesas(b);
     const personas = entero(b.personas, 1, 40);
     if (personas == null) throw new ErrorHttp(400, "Poné cuántas personas son", "personas");
@@ -633,7 +632,6 @@ export class Salon extends DurableObject {
   aEditarReserva(id, b) {
     const r = this.q(`SELECT * FROM reservas WHERE id=?`, id)[0];
     if (!r) throw new ErrorHttp(404, "Reserva inexistente", "no_existe");
-    const c = this.config();
     const n = { ...r };
     if (b.estado !== undefined) {
       if (!ESTADOS_RESERVA.includes(b.estado)) throw new ErrorHttp(400, "Estado inválido", "estado");
@@ -648,7 +646,7 @@ export class Salon extends DurableObject {
       const d = entero(b.desde, 0, 2000);
       if (d == null) throw new ErrorHttp(400, "Horario inválido", "hora");
       n.desde = d;
-      n.hasta = d + c.settings.estadiaMin;
+      n.hasta = this.finTurno(d);
     }
     if (b.personas !== undefined) {
       const p = entero(b.personas, 1, 40);

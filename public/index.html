@@ -327,6 +327,13 @@ a{color:var(--rojo);text-decoration:none}
 .rform__mesa{max-width:52%;overflow-wrap:anywhere}
 .raviso{font-size:12px;line-height:1.45;color:#C9D4F2;background:rgba(255,255,255,.07);border-radius:10px;padding:10px 12px}
 .raviso--ticket{color:var(--gris);background:rgba(0,0,0,.05);margin-top:10px}
+.raviso--importante{background:#FFD24A;color:#3A2A00;font-weight:600;border-left:4px solid #E0A400}
+.raviso--importante b{display:block;font-size:10.5px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;margin-bottom:2px}
+.raviso--importante[hidden]{display:none}
+.ticket .raviso--importante{margin-top:10px;color:#3A2A00}
+[data-aviso-turno] .raviso{margin-top:10px}
+.rleyenda{font-size:11.5px;color:#A9B7E4;margin:-3px 0 9px}
+.rleyenda b{color:#FFCF5C;font-weight:800}
 .ticket__mesa--junta{font-size:22px;line-height:1.1}
 
 .ticket{position:relative;display:grid;grid-template-columns:1fr auto;background:var(--crema);color:var(--tinta);
@@ -641,8 +648,10 @@ body.splash-activo{overflow:hidden}
       </div>
       <div class="rpaso">
         <p class="rrot"><b>3</b>Horario</p>
+        <p class="rleyenda">Turnos de 20:00 y 21:30 · <b>sujeto a modificaciones</b></p>
         <div class="horas" data-horas role="listbox" aria-label="Horario de la reserva"></div>
         <p class="rnota" data-horas-nota></p>
+        <div data-aviso-turno></div>
       </div>
       <div class="rpaso">
         <p class="rrot" style="justify-content:space-between">
@@ -670,8 +679,14 @@ body.splash-activo{overflow:hidden}
       <input class="campo" name="tel" type="tel" inputmode="tel" placeholder="Teléfono" autocomplete="tel">
       <div style="display:flex;gap:10px">
         <input class="campo" name="fecha" type="date" aria-label="Fecha" style="flex:1;min-width:0">
-        <input class="campo" name="hora" type="time" aria-label="Hora" style="flex:1;min-width:0">
+        <select class="campo" name="hora" aria-label="Turno" style="flex:1;min-width:0">
+          <option value="">Turno</option>
+          <option value="20:00">20:00 a 21:30</option>
+          <option value="21:30">21:30</option>
+        </select>
       </div>
+      <p class="rleyenda" style="margin:0">Turnos de 20:00 y 21:30 · <b>sujeto a modificaciones</b></p>
+      <p class="raviso raviso--importante" data-aviso-respaldo hidden><b>Importante</b>El turno de las 20:00 termina a las 21:30. A esa hora necesitamos la mesa para el turno siguiente.</p>
       <div>
         <p class="rot">Comensales</p>
         <div class="pax" data-pax role="group" aria-label="Cantidad de comensales"></div>
@@ -1393,9 +1408,12 @@ $('[data-form-reserva]').addEventListener('submit', ev => {
   const L = ['*NUEVA RESERVA — BAMBA CLUB PIZZERO*', '',
              '*Nombre:* ' + v('nombre'), '*Teléfono:* ' + v('tel'), '*Personas:* ' + pax];
   if (v('fecha')) L.push('*Fecha:* ' + v('fecha'));
-  if (v('hora'))  L.push('*Hora:* ' + v('hora'));
+  if (v('hora'))  L.push('*Turno:* ' + (v('hora') === '20:00' ? '20:00 a 21:30' : v('hora')));
   if (v('nota'))  L.push('*Notas:* ' + v('nota'));
   window.open('https://wa.me/' + WA + '?text=' + encodeURIComponent(L.join('\n')), '_blank', 'noopener');
+});
+$('[data-form-reserva] [name="hora"]').addEventListener('change', ev => {
+  $('[data-aviso-respaldo]').hidden = ev.target.value !== '20:00';
 });
 
 /* ══════════════════════════════════════════════════════════
@@ -1430,14 +1448,26 @@ const postJSON = (ruta, cuerpo) => api(ruta, { method:'POST', headers:{ 'content
 const estadia = () => RES.cfg.settings.estadiaMin;
 const ahoraMin = () => RES.disp ? RES.disp.ahoraMin + (Date.now() - RES.dispTs) / 60000 : 0;
 
+/* Igual que finTurno en el Worker: la estadía, pero sin pasar del turno siguiente
+   (el turno de las 20:00 termina a las 21:30). */
+const turnosFijos = () => (RES.cfg && RES.cfg.settings.turnos) || [];
+function finDe(desde) {
+  const sig = turnosFijos().filter(t => t > desde).sort((a, b) => a - b)[0];
+  return sig == null ? desde + estadia() : Math.min(desde + estadia(), sig);
+}
+/* Aviso IMPORTANTE para los turnos que terminan porque arranca el siguiente (el de las 20:00). */
+function avisoTurno(desde) {
+  if (desde == null || !turnosFijos().some(t => t > desde)) return '';
+  return `<p class="raviso raviso--importante" role="note"><b>Importante</b>El turno de las ${hhmm(desde)} termina a las ${hhmm(finDe(desde))}. A esa hora necesitamos la mesa para el turno siguiente.</p>`;
+}
 function ocupadaEn(mesa, desde) {
-  const hasta = desde + estadia();
+  const hasta = finDe(desde);
   return !!RES.disp && RES.disp.ocupadas.some(o => o.mesa === mesa && o.desde < hasta && desde < o.hasta);
 }
 function holdEn(mesa, desde) {
-  const hasta = desde + estadia(), t = Date.now();
+  const hasta = finDe(desde), t = Date.now();
   return RES.holds.some(h => h.sid !== RES.sid && String(h.mesa).split(',').includes(mesa) && h.fecha === RES.fecha
-    && h.desde < hasta && desde < h.desde + estadia() && t - h.rec < 180000);
+    && h.desde < hasta && desde < finDe(h.desde) && t - h.rec < 180000);
 }
 function horas() {
   if (!RES.disp) return [];
@@ -1516,6 +1546,7 @@ function pintarPaxRes() {
 /* ---------- horarios ---------- */
 function pintarHoras() {
   const cont = $('[data-horas]'), nota = $('[data-horas-nota]');
+  $('[data-aviso-turno]').innerHTML = RES.disp && !RES.disp.cerrado ? avisoTurno(RES.desde) : '';
   if (!RES.disp) { cont.innerHTML = ''; nota.textContent = ''; return; }
   if (RES.disp.cerrado) { cont.innerHTML = ''; nota.textContent = 'Ese día el local está cerrado.'; return; }
   const hs = horas();
@@ -1671,8 +1702,9 @@ function pintarForm() {
     <form class="rform" data-rformulario novalidate>
       <div class="rform__res">
         <span class="rform__mesa">${ids.length > 1 ? 'MESAS ' : 'MESA '}${esc(ids.join(' + '))}</span>
-        <span class="rform__det"><b>${fechaCorta(RES.fecha)} · ${hhmm(RES.desde)}</b><br>${RES.pax} ${RES.pax === 1 ? 'persona' : 'personas'} · hasta las ${hhmm(RES.desde + estadia())}<br>${esc(zonaMesas(RES.mesa))}${ids.length > 1 ? ' · mesas juntas' : ''}</span>
+        <span class="rform__det"><b>${fechaCorta(RES.fecha)} · ${hhmm(RES.desde)}</b><br>${RES.pax} ${RES.pax === 1 ? 'persona' : 'personas'} · hasta las ${hhmm(finDe(RES.desde))}<br>${esc(zonaMesas(RES.mesa))}${ids.length > 1 ? ' · mesas juntas' : ''}</span>
       </div>
+      ${avisoTurno(RES.desde)}
       <input class="campo" name="nombre" placeholder="Tu nombre" autocomplete="name" maxlength="60" value="${esc(g.nombre)}">
       <input class="campo" name="tel" type="tel" inputmode="tel" placeholder="Teléfono (para confirmarte)" autocomplete="tel" maxlength="20" value="${esc(g.tel)}">
       <textarea class="campo" name="nota" rows="2" maxlength="200" placeholder="¿Cumpleaños, alergias, cochecito? (opcional)" style="resize:vertical"></textarea>
@@ -1686,13 +1718,15 @@ function pintarTicket() {
   const cont = $('[data-rticket]'), t = RES.ticket;
   if (!t) { cont.innerHTML = ''; return; }
   const tm = String(t.mesa).split(','), zona = zonaMesas(t.mesa);
-  const msg = `Hola! Reservé la ${txtMesas(t.mesa)} para el ${fechaCorta(t.fecha)} a las ${hhmm(t.desde)} (${t.personas} ${t.personas === 1 ? 'persona' : 'personas'}) a nombre de ${t.nombre}. Código: ${t.codigo}`;
+  const corta = turnosFijos().some(x => x > t.desde);
+  const msg = `Hola! Reservé la ${txtMesas(t.mesa)} para el ${fechaCorta(t.fecha)} a las ${hhmm(t.desde)}${corta ? ' (turno hasta las ' + hhmm(t.hasta) + ')' : ''} (${t.personas} ${t.personas === 1 ? 'persona' : 'personas'}) a nombre de ${t.nombre}. Código: ${t.codigo}`;
   cont.innerHTML = `
     <div class="ticket">
       <div class="ticket__main">
         <p class="eyebrow">Tu reserva</p>
         <p class="ticket__mesa${tm.length > 1 ? ' ticket__mesa--junta' : ''}">${tm.length > 1 ? 'MESAS ' : 'MESA '}${esc(tm.join(' + '))}</p>
         <p class="ticket__det"><b>${fechaCorta(t.fecha)} · ${hhmm(t.desde)}</b> a ${hhmm(t.hasta)}<br>${t.personas} ${t.personas === 1 ? 'persona' : 'personas'} · ${esc(t.nombre)}${zona ? '<br>' + esc(zona) : ''}</p>
+        ${corta ? `<p class="raviso raviso--importante" role="note"><b>Importante</b>Tu turno termina a las ${hhmm(t.hasta)}. A esa hora necesitamos la mesa para el turno siguiente.</p>` : ''}
         <p class="raviso raviso--ticket">Trataremos de mantener la mesa solicitada, pero está sujeto a modificaciones según demanda, respetando lugar de salón y cantidad de comensales.</p>
       </div>
       <div class="ticket__stub"><span class="eyebrow">Código</span><span class="ticket__cod">${esc(t.codigo)}</span></div>
