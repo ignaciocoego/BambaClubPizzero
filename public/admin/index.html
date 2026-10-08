@@ -200,6 +200,30 @@ label.campo .dato{text-transform:none;letter-spacing:0;font-weight:500;color:var
 @keyframes subir{from{transform:translateY(100%)}to{transform:none}}
 @keyframes brotar{from{opacity:0;transform:translateY(12px) scale(.98)}to{opacity:1;transform:none}}
 
+/* club */
+.badge--socio,.badge--activo{background:#FFF1C2;color:#7A5300}
+.badge--baja{background:var(--rojo-suave);color:var(--rojo)}
+.socio-nota{display:flex;align-items:center;justify-content:space-between;gap:10px;background:#FFF8E1;border:1.5px solid #F2DFA6;border-radius:12px;padding:10px 12px;font-size:13px;font-weight:700}
+.socio-nota small{font-weight:500;color:var(--gris)}
+.pts{font-family:var(--display);font-size:40px;line-height:1;color:var(--azul)}
+.pts small{font-family:var(--texto);font-size:12px;font-weight:800;letter-spacing:.12em;color:var(--gris);margin-left:6px}
+.bloque-c{border-top:1.5px dashed var(--linea);padding-top:12px}
+.bloque-c > .eyebrow{color:var(--gris);margin-bottom:8px}
+.qrbox{background:#fff;border:1.5px solid var(--linea);border-radius:14px;padding:12px;width:220px;max-width:100%;margin:4px auto}
+.qrbox svg{display:block;width:100%;height:auto}
+.link-cred{font-size:11.5px;word-break:break-all;color:var(--gris);background:var(--papel);border:1.5px dashed var(--linea);border-radius:10px;padding:8px 10px}
+.seg{display:flex;gap:6px;margin-bottom:10px}
+.mov{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-bottom:1px dashed var(--linea);font-size:13px}
+.mov small{display:block;color:var(--gris);font-size:11.5px}
+.mov b{font-variant-numeric:tabular-nums;white-space:nowrap}
+.mov .mas{color:var(--verde)}
+.mov .menos{color:var(--rojo)}
+.mov button{color:var(--gris);font-size:13px;padding:2px 6px}
+.fila-ed{display:grid;grid-template-columns:1fr 92px auto;gap:6px;margin-bottom:6px}
+.fila-ed--uno{grid-template-columns:1fr auto}
+.camara{position:relative;background:#000;border-radius:14px;overflow:hidden;aspect-ratio:4/3}
+.camara video{width:100%;height:100%;object-fit:cover;display:block}
+.camara::after{content:"";position:absolute;inset:18%;border:3px solid rgba(255,255,255,.85);border-radius:16px;box-shadow:0 0 0 999px rgba(0,0,0,.25)}
 .toasts{position:fixed;left:0;right:0;bottom:16px;z-index:120;display:flex;flex-direction:column;align-items:center;gap:8px;padding:0 14px;pointer-events:none}
 .toast{background:var(--tinta);color:#fff;border-radius:13px;padding:12px 18px;font-size:13px;font-weight:600;box-shadow:0 10px 26px rgba(0,0,0,.34);animation:brotar .22s ease;max-width:460px}
 .toast--nuevo{background:var(--azul);}
@@ -241,6 +265,7 @@ label.campo .dato{text-transform:none;letter-spacing:0;font-weight:500;color:var
       <button class="tab" role="tab" data-tab="hoy">Hoy</button>
       <button class="tab" role="tab" data-tab="reservas">Reservas</button>
       <button class="tab" role="tab" data-tab="pedidos">Pedidos <b data-nuevos hidden>0</b></button>
+      <button class="tab" role="tab" data-tab="club">Club</button>
       <button class="tab" role="tab" data-tab="numeros">Números</button>
       <button class="tab" role="tab" data-tab="salon">Salón</button>
     </div>
@@ -251,6 +276,7 @@ label.campo .dato{text-transform:none;letter-spacing:0;font-weight:500;color:var
 <div data-modal hidden></div>
 <div class="toasts" data-toasts aria-live="polite"></div>
 
+<script src="/club/qrcode.js"></script>
 <script>
 (() => {
 'use strict';
@@ -283,6 +309,7 @@ const S = {
   fRes: { desde: ahoraAR().fecha, hasta: sumarDias(ahoraAR().fecha, 14), estado: '', q: '' }, reservas: [],
   fPed: { desde: sumarDias(ahoraAR().fecha, -6), hasta: ahoraAR().fecha, estado: '', q: '' }, pedidos: [],
   rango: 30, stats: null,
+  club: { q: '', socios: [], resumen: null, cfg: null, edit: null, socio: null, stream: null, scanT: null },
   edit: null, editSet: null, sel: null,
   ws: null, vivo: false, reint: 0, pingT: null, nuevos: 0, sonido: true, refT: null, cargando: 0,
 };
@@ -385,6 +412,8 @@ function refrescarSuave() {
     else if (S.tab === 'reservas') cargarReservas(true);
     else if (S.tab === 'pedidos') cargarPedidos(true);
     else if (S.tab === 'numeros') cargarNumeros(true);
+    else if (S.tab === 'club') cargarClub(true);
+    if (S.club.socio && $('[data-socio-modal]')) abrirSocio(S.club.socio, true);
   }, 250);
 }
 function pintarNuevos() { const b = $('[data-nuevos]'); b.hidden = S.nuevos === 0; b.textContent = S.nuevos; }
@@ -395,7 +424,7 @@ function irA(tab) {
   $$('[data-tab]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === tab)));
   if (tab === 'pedidos') { S.nuevos = 0; pintarNuevos(); }
   window.scrollTo(0, 0);
-  ({ hoy: vistaHoy, reservas: vistaReservas, pedidos: vistaPedidos, numeros: vistaNumeros, salon: vistaSalon })[tab]();
+  ({ hoy: vistaHoy, reservas: vistaReservas, pedidos: vistaPedidos, club: vistaClub, numeros: vistaNumeros, salon: vistaSalon })[tab]();
 }
 $('.nav').addEventListener('click', ev => { const b = ev.target.closest('[data-tab]'); if (b) irA(b.dataset.tab); });
 
@@ -587,7 +616,7 @@ function itemPedido(p) {
   return `<button class="item item--${p.estado}" type="button" data-pedido="${p.id}">
     <div class="item__hora">${horaDeTs(p.creado)}<small>#${p.id}</small></div>
     <div><p class="item__t">${esc(p.nombre || 'Sin nombre')} · ${plata(p.total)}</p><p class="item__s">${esc(res)}</p><p class="item__s">${esc(p.modo)}${p.pago ? ' · ' + esc(p.pago) : ''}</p></div>
-    <div class="item__d"><span class="badge badge--${p.estado}">${ESTADO_PED[p.estado]}</span></div></button>`;
+    <div class="item__d"><span class="badge badge--${p.estado}">${ESTADO_PED[p.estado]}</span>${p.socio ? `<span class="badge badge--socio">★ ${esc(p.socio.numeroTxt)}</span>` : ''}</div></button>`;
 }
 
 /* ══════════════ RESERVAS ══════════════ */
@@ -760,6 +789,269 @@ function pintarGraficos() {
 }
 let rzT; window.addEventListener('resize', () => { clearTimeout(rzT); rzT = setTimeout(() => { if (S.tab === 'numeros') pintarGraficos(); }, 200); });
 
+/* ══════════════ CLUB ══════════════
+   Socios del Club Bamba: alta, credencial (link secreto), compras en el local,
+   canjes de premios y la configuración del programa. */
+const qrSVG = texto => { const q = qrcode(0, 'M'); q.addData(texto); q.make(); return q.createSvgTag({ cellSize: 6, margin: 0, scalable: true }); };
+const fTs = ts => fCorta(new Date(ts - 3 * 3600 * 1000).toISOString().slice(0, 10));
+const cumpleTxt = c => c ? c.slice(3, 5) + '/' + c.slice(0, 2) : '';                 // "03-15" → "15/03"
+const deCumple = s => { const m = /^(\d{1,2})\/(\d{1,2})$/.exec(String(s).trim()); return m && +m[1] >= 1 && +m[1] <= 31 && +m[2] >= 1 && +m[2] <= 12 ? pad(+m[2]) + '-' + pad(+m[1]) : ''; };
+const msgCredencial = (s, link) => `¡Hola ${s.nombre.split(' ')[0]}! Ya sos socio del Club Bamba (Nº ${s.numeroTxt}).\n\nEsta es tu credencial: ${link}\n\nGuardala en la pantalla de inicio y mostrá el QR al pagar para sumar puntos. Si pedís desde la web con este celular, también suman.`;
+
+function vistaClub() {
+  $('[data-main]').innerHTML = `
+    <div class="enc">
+      <div><h1>CLUB</h1><p>Socios, puntos y premios</p></div>
+      <div class="fila">
+        <button class="btn btn--azul btn--chico" type="button" data-c-escanear>📷 Escanear credencial</button>
+        <button class="btn btn--chico" type="button" data-c-nuevo>＋ Nuevo socio</button>
+      </div>
+    </div>
+    <div class="kpis" data-c-kpis></div>
+    <div class="grid2">
+      <div class="card">
+        <div class="card__tit"><span>SOCIOS</span><small data-c-cuenta></small></div>
+        <input class="dato" type="search" data-c-q placeholder="Buscar por nombre, teléfono o Nº de socio" value="${esc(S.club.q)}" style="margin-bottom:10px">
+        <div class="lista" data-c-lista><p class="carga">Cargando…</p></div>
+      </div>
+      <div class="card">
+        <div class="card__tit"><span>PREMIOS Y REGLAS</span><small>lo ven los socios</small></div>
+        <div data-c-reglas><p class="carga">Cargando…</p></div>
+      </div>
+    </div>`;
+  cargarClub();
+}
+async function cargarClub(suave) {
+  try {
+    const [l, c] = await Promise.all([
+      api('/api/admin/socios?' + qs({ q: S.club.q })),
+      suave && S.club.cfg ? null : api('/api/admin/club'),
+    ]);
+    if (S.tab !== 'club') return;
+    S.club.socios = l.socios; S.club.resumen = l;
+    if (c) {
+      S.club.cfg = c;
+      S.club.edit = { pesosPorPunto: c.pesosPorPunto, premios: c.premios.map(p => ({ ...p })), beneficios: c.beneficios.slice() };
+      pintarReglas();
+    }
+    pintarSocios();
+  } catch (e) { if (!suave) avisar(e.message, 'error'); }
+}
+function pintarSocios() {
+  const r = S.club.resumen, gw = S.club.cfg && S.club.cfg.googleWallet;
+  $('[data-c-kpis]').innerHTML = `
+    <div class="kpi"><p class="eyebrow">Socios activos</p><p class="kpi__v" style="--c:var(--azul)">${r.activos}</p><p class="kpi__s">${r.total} en total</p></div>
+    <div class="kpi"><p class="eyebrow">Puntos dados</p><p class="kpi__v" style="--c:var(--verde)">${r.puntosDados.toLocaleString('es-AR')}</p><p class="kpi__s">compras y regalos</p></div>
+    <div class="kpi"><p class="eyebrow">Puntos canjeados</p><p class="kpi__v">${r.puntosCanjeados.toLocaleString('es-AR')}</p><p class="kpi__s">en premios</p></div>
+    <div class="kpi"><p class="eyebrow">Google Wallet</p><p class="kpi__v" style="--c:${gw ? 'var(--verde)' : 'var(--gris)'};font-size:21px">${gw ? 'Activo' : 'Sin configurar'}</p><p class="kpi__s">${gw ? 'los socios la suman con un botón' : 'se activa con la cuenta de emisor'}</p></div>`;
+  $('[data-c-cuenta]').textContent = S.club.socios.length + (S.club.socios.length === 1 ? ' socio' : ' socios');
+  $('[data-c-lista]').innerHTML = S.club.socios.map(s => `
+    <button class="item${s.estado === 'baja' ? ' item--cancelado' : ''}" type="button" data-socio="${s.id}">
+      <div class="item__hora">${esc(s.numeroTxt)}<small>Nº socio</small></div>
+      <div><p class="item__t">${esc(s.nombre)}</p><p class="item__s">${esc(s.tel)} · ${s.ultimo ? 'último movimiento ' + fTs(s.ultimo) : 'sin movimientos'}</p></div>
+      <div class="item__d"><span class="badge badge--${s.estado}">${s.estado === 'baja' ? 'Baja' : s.puntos + ' pts'}</span></div>
+    </button>`).join('') || `<p class="vacio">${S.club.q ? 'No hay socios con esa búsqueda.' : 'Todavía no hay socios. Tocá “＋ Nuevo socio”.'}</p>`;
+}
+function pintarReglas() {
+  const e = S.club.edit;
+  $('[data-c-reglas]').innerHTML = `
+    <label class="campo" style="margin-bottom:6px">Pesos por punto<input class="dato" type="number" min="1" step="100" data-cr="pesosPorPunto" value="${e.pesosPorPunto}"></label>
+    <p class="nota" data-cr-ej style="margin-bottom:14px">${ejemploPuntos()}</p>
+    <p class="eyebrow" style="color:var(--gris);margin-bottom:6px">Premios · nombre y puntos</p>
+    ${e.premios.map((p, i) => `<div class="fila-ed"><input class="dato" data-cp="${i}|nombre" value="${esc(p.nombre)}" placeholder="Premio" maxlength="60"><input class="dato" type="number" min="1" data-cp="${i}|puntos" value="${p.puntos}" aria-label="Puntos"><button class="btn btn--peligro btn--chico" type="button" data-cp-quitar="${i}" aria-label="Quitar premio">✕</button></div>`).join('')}
+    <button class="btn btn--claro btn--chico" type="button" data-cp-nuevo style="margin-bottom:16px">＋ Agregar premio</button>
+    <p class="eyebrow" style="color:var(--gris);margin-bottom:6px">Beneficios</p>
+    ${e.beneficios.map((b, i) => `<div class="fila-ed fila-ed--uno"><input class="dato" data-cb="${i}" value="${esc(b)}" maxlength="120"><button class="btn btn--peligro btn--chico" type="button" data-cb-quitar="${i}" aria-label="Quitar beneficio">✕</button></div>`).join('')}
+    <button class="btn btn--claro btn--chico" type="button" data-cb-nuevo>＋ Agregar beneficio</button>
+    <div class="fila" style="margin-top:18px;justify-content:flex-end"><button class="btn btn--claro btn--chico" type="button" data-cr-reset>Descartar</button><button class="btn btn--chico" type="button" data-cr-guardar>Guardar premios y reglas</button></div>`;
+}
+const ejemploPuntos = () => { const n = Math.floor(30000 / Math.max(1, +S.club.edit.pesosPorPunto || 1)); return `Una compra de ${plata(30000)} suma ${n} ${n === 1 ? 'punto' : 'puntos'}.`; };
+async function guardarReglas() {
+  const e = S.club.edit;
+  try {
+    const r = await post('/api/admin/club', { pesosPorPunto: +e.pesosPorPunto, premios: e.premios.filter(p => p.nombre.trim()), beneficios: e.beneficios.filter(b => b.trim()) }, 'PUT');
+    S.club.cfg = { ...S.club.cfg, ...r };
+    S.club.edit = { pesosPorPunto: r.pesosPorPunto, premios: r.premios.map(p => ({ ...p })), beneficios: r.beneficios.slice() };
+    pintarReglas(); avisar('Premios y reglas guardados. Ya se ven en la web.');
+  } catch (er) { avisar(er.message, 'error'); }
+}
+
+function abrirNuevoSocio() {
+  abrirModal(`
+    <div class="hoja__enc"><p class="hoja__tit">NUEVO SOCIO</p><button class="cerrar" data-cerrar aria-label="Cerrar" type="button">✕</button></div>
+    <form data-form-socio novalidate style="display:contents">
+      <div class="hoja__cuerpo">
+        <label class="campo">Nombre y apellido<input class="dato" name="nombre" maxlength="60" autocomplete="off"></label>
+        <label class="campo">Teléfono (WhatsApp)<input class="dato" name="tel" type="tel" maxlength="20" autocomplete="off"></label>
+        <div class="dosc">
+          <label class="campo">Cumpleaños (opcional)<input class="dato" name="cumple" placeholder="DD/MM" maxlength="5" inputmode="numeric"></label>
+          <label class="campo">Mail (opcional)<input class="dato" name="email" type="email" maxlength="80"></label>
+        </div>
+        <label class="campo">Nota (opcional)<input class="dato" name="nota" maxlength="200"></label>
+        <p class="nota">Al crearlo te damos el link de su credencial para mandárselo por WhatsApp, o un QR para que lo escanee acá mismo.</p>
+        <p class="error" data-err role="alert"></p>
+      </div>
+      <div class="hoja__pie"><button class="btn" type="submit">Crear socio</button></div>
+    </form>`);
+  const f = $('[data-form-socio]');
+  f.addEventListener('submit', async ev => {
+    ev.preventDefault();
+    const v = n => f.elements[n].value;
+    const cumple = v('cumple').trim();
+    if (cumple && !deCumple(cumple)) { $('[data-err]').textContent = 'El cumpleaños va como DD/MM (por ejemplo 15/03).'; return; }
+    try {
+      const r = await post('/api/admin/socios', { nombre: v('nombre'), tel: v('tel'), email: v('email'), cumple: deCumple(cumple), nota: v('nota') });
+      avisar('Socio Nº ' + r.socio.numeroTxt + ' creado');
+      if (S.tab === 'club') cargarClub(true);
+      abrirSocio(r.socio.id, false, true);
+    } catch (e) { $('[data-err]').textContent = e.message; }
+  });
+}
+
+/* Ficha del socio. `suave`: solo refresca puntos y movimientos (no pisa lo que se está escribiendo). */
+async function abrirSocio(id, suave, recien) {
+  let d;
+  try { d = await api('/api/admin/socios/' + id); } catch (e) { if (!suave) avisar(e.message, 'error'); return; }
+  const s = d.socio, activo = s.estado === 'activo';
+  const premios = d.premios.slice().sort((a, b) => a.puntos - b.puntos);
+  const opcionesPremio = () => premios.map(p => `<option value="${esc(p.id)}"${p.puntos > s.puntos ? ' disabled' : ''}>${esc(p.nombre)} · ${p.puntos} pts${p.puntos > s.puntos ? ' (le faltan ' + (p.puntos - s.puntos) + ')' : ''}</option>`).join('');
+  const dinamico = `
+    <p class="pts">${s.puntos}<small>PUNTOS</small></p>
+    <div class="bloque-c" style="margin-top:12px"><p class="eyebrow">Movimientos</p>
+      ${d.movimientos.map(m => `<div class="mov"><span>${esc(m.detalle)}<small>${fTs(m.creado)} ${horaDeTs(m.creado)}${m.monto ? ' · ' + plata(m.monto) : ''}</small></span>
+        <span style="display:flex;align-items:center;gap:4px"><b class="${m.puntos > 0 ? 'mas' : m.puntos < 0 ? 'menos' : ''}">${m.puntos > 0 ? '+' : ''}${m.puntos}</b>${m.pedidoId ? '' : `<button type="button" data-mov-borrar="${m.id}" aria-label="Anular movimiento" title="Anular">✕</button>`}</span></div>`).join('') || '<p class="nota">Sin movimientos todavía.</p>'}
+    </div>
+    ${d.pedidos.length ? `<div class="bloque-c" style="margin-top:12px"><p class="eyebrow">Pedidos web</p>
+      ${d.pedidos.map(p => `<div class="mov"><span>#${p.id} · ${plata(p.total)}<small>${fTs(p.creado)} · ${ESTADO_PED[p.estado]}</small></span><b class="${p.acreditado ? 'mas' : ''}">${p.acreditado ? '+' + p.puntos : p.estado === 'cancelado' ? '—' : '(+' + p.puntos + ')'}</b></div>`).join('')}</div>` : ''}`;
+
+  S.club.socio = id; S.club.link = d.link; S.club.ficha = s;
+  if (suave) {
+    const din = $('[data-sm-din]'); if (!din) return;
+    din.innerHTML = dinamico;
+    const sel = $('[data-sm-form="canje"] select'); if (sel) sel.innerHTML = opcionesPremio();
+    return;
+  }
+  const waLink = s.tel ? linkWA(s.tel) + '?text=' + encodeURIComponent(msgCredencial(s, d.link)) : '';
+  abrirModal(`
+    <div class="hoja__enc" data-socio-modal><p class="hoja__tit">${esc(s.nombre.toUpperCase())}</p>
+      <span class="badge badge--${s.estado}" style="margin-top:6px">Nº ${esc(s.numeroTxt)}${activo ? '' : ' · BAJA'}</span>
+      <button class="cerrar" data-cerrar aria-label="Cerrar" type="button">✕</button></div>
+    <div class="hoja__cuerpo">
+      ${recien ? '<p class="socio-nota">¡Listo! Ahora mandale el link de su credencial o mostrale el QR.</p>' : ''}
+      <p class="nota">${s.tel ? `<a href="tel:${esc(s.tel)}">${esc(s.tel)}</a> · ` : ''}${s.email ? esc(s.email) + ' · ' : ''}${s.cumple ? 'cumple ' + cumpleTxt(s.cumple) + ' · ' : ''}socio desde ${fTs(s.creado)}${s.nota ? ' · “' + esc(s.nota) + '”' : ''}</p>
+      ${activo ? `
+      <div class="bloque-c">
+        <p class="eyebrow">Cargar</p>
+        <div class="seg">
+          <button class="chip" type="button" data-sm-tipo="compra" aria-selected="true">Compra en el local</button>
+          <button class="chip" type="button" data-sm-tipo="canje" aria-selected="false">Canjear premio</button>
+          <button class="chip" type="button" data-sm-tipo="ajuste" aria-selected="false">Ajuste</button>
+        </div>
+        <form class="fila" data-sm-form="compra" novalidate><input class="dato" name="monto" type="number" min="1" step="100" inputmode="numeric" placeholder="Monto de la compra $" style="flex:1"><button class="btn btn--verde" type="submit">Sumar puntos</button><p class="nota" data-sm-calc style="width:100%"></p></form>
+        <form class="fila" data-sm-form="canje" novalidate hidden><select class="dato" name="premio" style="flex:1">${opcionesPremio()}</select><button class="btn" type="submit">Canjear</button></form>
+        <form class="fila" data-sm-form="ajuste" novalidate hidden><input class="dato" name="puntos" type="number" placeholder="+/− puntos" style="width:120px"><input class="dato" name="detalle" placeholder="Motivo (ej: regalo de cumpleaños)" maxlength="120" style="flex:1"><button class="btn btn--azul" type="submit">Aplicar</button></form>
+        <p class="error" data-sm-err role="alert"></p>
+      </div>` : ''}
+      <div data-sm-din>${dinamico}</div>
+      <div class="bloque-c">
+        <p class="eyebrow">Credencial</p>
+        <div class="fila">
+          ${waLink && activo ? `<a class="btn btn--verde btn--chico" href="${esc(waLink)}" target="_blank" rel="noopener">Enviar por WhatsApp</a>` : ''}
+          <button class="btn btn--claro btn--chico" type="button" data-sm-copiar>Copiar link</button>
+          <button class="btn btn--claro btn--chico" type="button" data-sm-qr>QR para escanear</button>
+        </div>
+        <div data-sm-qrbox${recien ? '' : ' hidden'} style="margin-top:10px"><div class="qrbox">${qrSVG(d.link)}</div><p class="nota" style="text-align:center">Que lo escanee con la cámara del celular: se le abre su credencial.</p></div>
+        <p class="link-cred" style="margin-top:10px">${esc(d.link)}</p>
+        <p class="nota" style="margin-top:8px">¿Perdió el link o lo compartió? <button class="btn btn--claro btn--chico" type="button" data-sm-nuevolink>Generar link nuevo</button> El anterior deja de andar.</p>
+      </div>
+      <details class="bloque-c">
+        <summary class="eyebrow" style="cursor:pointer;color:var(--gris)">Editar datos</summary>
+        <form data-sm-datos novalidate style="display:flex;flex-direction:column;gap:10px;margin-top:10px">
+          <label class="campo">Nombre y apellido<input class="dato" name="nombre" value="${esc(s.nombre)}" maxlength="60"></label>
+          <label class="campo">Teléfono<input class="dato" name="tel" type="tel" value="${esc(s.tel)}" maxlength="20"></label>
+          <div class="dosc">
+            <label class="campo">Cumpleaños<input class="dato" name="cumple" value="${esc(cumpleTxt(s.cumple))}" placeholder="DD/MM" maxlength="5"></label>
+            <label class="campo">Mail<input class="dato" name="email" type="email" value="${esc(s.email)}" maxlength="80"></label>
+          </div>
+          <label class="campo">Nota<input class="dato" name="nota" value="${esc(s.nota)}" maxlength="200"></label>
+          <p class="error" data-sm-err2 role="alert"></p>
+          <div class="fila"><button class="btn btn--chico" type="submit">Guardar datos</button>
+            <button class="btn btn--peligro btn--chico" type="button" data-sm-estado="${activo ? 'baja' : 'activo'}">${activo ? 'Dar de baja' : 'Reactivar'}</button></div>
+        </form>
+      </details>
+    </div>`);
+}
+async function movimientoSocio(f) {
+  const tipo = f.dataset.smForm, v = n => f.elements[n] ? f.elements[n].value : '';
+  const cuerpo = tipo === 'compra' ? { tipo, monto: +v('monto') } : tipo === 'canje' ? { tipo, premio: v('premio') } : { tipo, puntos: +v('puntos'), detalle: v('detalle') };
+  const err = $('[data-sm-err]'); err.textContent = '';
+  try {
+    const r = await post('/api/admin/socios/' + S.club.socio + '/movimientos', cuerpo);
+    const m = r.movimiento;
+    avisar(`${m.detalle} · ${m.puntos > 0 ? '+' : ''}${m.puntos} puntos (queda en ${r.puntos})`); bip();
+    f.reset(); const c = $('[data-sm-calc]'); if (c) c.textContent = '';
+    abrirSocio(S.club.socio, true);
+    if (S.tab === 'club') cargarClub(true);
+  } catch (e) { err.textContent = e.message; }
+}
+async function editarSocio(cambios, ok) {
+  try {
+    await post('/api/admin/socios/' + S.club.socio, cambios, 'PATCH');
+    avisar(ok); abrirSocio(S.club.socio);
+    if (S.tab === 'club') cargarClub(true);
+  } catch (e) { const er = $('[data-sm-err2]') || $('[data-sm-err]'); if (er) er.textContent = e.message; else avisar(e.message, 'error'); }
+}
+
+/* Escáner: lee el QR de la credencial (BAMBA:0042) con la cámara. Si el navegador no puede,
+   se escribe el número (o un lector de códigos USB lo escribe solo). */
+async function abrirEscaner() {
+  abrirModal(`
+    <div class="hoja__enc"><p class="hoja__tit">ESCANEAR CREDENCIAL</p><button class="cerrar" data-cerrar aria-label="Cerrar" type="button">✕</button></div>
+    <div class="hoja__cuerpo">
+      <div class="camara" data-cam hidden><video playsinline muted></video></div>
+      <p class="nota" data-cam-nota>Abriendo la cámara…</p>
+      <form class="fila" data-form-buscar-socio novalidate><input class="dato" name="n" placeholder="Nº de socio (o BAMBA:0042)" autocomplete="off" style="flex:1"><button class="btn btn--azul" type="submit">Buscar</button></form>
+      <p class="error" data-err role="alert"></p>
+    </div>`);
+  const nota = $('[data-cam-nota]');
+  if (!('BarcodeDetector' in window) || !navigator.mediaDevices) {
+    nota.textContent = 'Este navegador no lee QR con la cámara (Chrome en Android sí). Escribí el número de socio: está abajo del nombre en la credencial.';
+    return;
+  }
+  try {
+    const det = new BarcodeDetector({ formats: ['qr_code'] });
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+    if (!$('[data-cam]')) { stream.getTracks().forEach(t => t.stop()); return; }   // se cerró mientras pedía permiso
+    S.club.stream = stream;
+    const v = $('[data-cam] video'); v.srcObject = stream; await v.play();
+    $('[data-cam]').hidden = false; nota.textContent = 'Apuntá al QR de la credencial del socio.';
+    const mirar = async () => {
+      if (!S.club.stream) return;
+      try {
+        const cod = (await det.detect(v)).map(x => x.rawValue).find(x => /^BAMBA:\d+$/i.test(x));
+        if (cod) { buscarSocioQR(cod); return; }
+      } catch (e) {}
+      S.club.scanT = setTimeout(mirar, 250);
+    };
+    mirar();
+  } catch (e) { nota.textContent = 'No pudimos abrir la cámara. Escribí el número de socio.'; }
+}
+function pararCamara() {
+  clearTimeout(S.club.scanT);
+  if (S.club.stream) { S.club.stream.getTracks().forEach(t => t.stop()); S.club.stream = null; }
+}
+async function buscarSocioQR(txt) {
+  pararCamara();
+  const m = /^(?:BAMBA:)?0*(\d{1,6})$/i.exec(String(txt).trim());
+  const err = t => { const e = $('[data-err]'); if (e) e.textContent = t; else avisar(t, 'error'); };
+  if (!m) { err('Escribí el número de socio (por ejemplo 42).'); return; }
+  try {
+    const d = await api('/api/admin/socios?' + qs({ qr: 'BAMBA:' + m[1] }));
+    if (!d.socios.length) { err('No hay ningún socio con el Nº ' + m[1].padStart(4, '0') + '.'); return; }
+    bip(); abrirSocio(d.socios[0].id);
+  } catch (e) { err(e.message); }
+}
+
 /* ══════════════ SALÓN (editor) ══════════════ */
 function vistaSalon() {
   S.edit = S.cfg.mesas.map(m => ({ ...m }));
@@ -843,7 +1135,7 @@ function abrirModal(html) {
   m.hidden = false; document.body.style.overflow = 'hidden';
   const p = $('input:not([type=hidden]), select', m); if (p && innerWidth > 720) p.focus();
 }
-function cerrarModal() { const m = $('[data-modal]'); m.hidden = true; m.innerHTML = ''; document.body.style.overflow = ''; }
+function cerrarModal() { pararCamara(); S.club.socio = null; const m = $('[data-modal]'); m.hidden = true; m.innerHTML = ''; document.body.style.overflow = ''; }
 document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && !$('[data-modal]').hidden) cerrarModal(); });
 
 function opcionesMesa(sel) {
@@ -917,6 +1209,8 @@ function abrirPedido(p) {
         <p style="font-weight:700;font-size:15px">${esc(p.nombre || 'Sin nombre')}</p>
         <p class="nota">${p.tel ? `<a href="tel:${esc(p.tel)}">${esc(p.tel)}</a> · <a href="${linkWA(p.tel)}" target="_blank" rel="noopener">WhatsApp</a> · ` : ''}${esc(p.modo)}${p.pago ? ' · ' + esc(p.pago) : ''}${p.horario ? ' · para las ' + esc(p.horario) : ''}</p>
       </div>
+      ${p.socio ? `<div class="socio-nota"><span>★ Socio Nº ${esc(p.socio.numeroTxt)} · ${esc(p.socio.nombre)}<br><small>${p.acreditado ? `Ya sumó ${p.puntos} puntos.` : `Suma ${p.puntos} puntos cuando lo marques <b>Entregado</b>.`}</small></span>
+        <button class="btn btn--claro btn--chico" type="button" data-ver-socio="${p.socio.id}">Ver socio</button></div>` : ''}
       <div>${p.items.map(i => `<div class="linea"><span>${i.qty}× ${esc(i.name)}${i.variant ? `<small>${esc(i.variant)}</small>` : ''}${i.sacar ? `<small><b>SACAR:</b> ${esc(i.sacar)} (mismo precio)</small>` : ''}${i.nota ? `<small>“${esc(i.nota)}”</small>` : ''}</span><b>${plata(i.qty * i.unit)}</b></div>`).join('')}
         <div class="total"><span>TOTAL</span><span>${plata(p.total)}</span></div></div>
       ${p.nota ? `<p class="nota">Nota del cliente: “${esc(p.nota)}”</p>` : ''}
@@ -931,11 +1225,59 @@ document.addEventListener('click', async ev => {
   const c = s => ev.target.closest(s); let el;
   if (c('[data-cerrar]')) { cerrarModal(); return; }
 
+  /* club */
+  if (c('[data-c-nuevo]')) { abrirNuevoSocio(); return; }
+  if (c('[data-c-escanear]')) { abrirEscaner(); return; }
+  if ((el = c('[data-socio]'))) { abrirSocio(+el.dataset.socio); return; }
+  if ((el = c('[data-ver-socio]'))) { abrirSocio(+el.dataset.verSocio); return; }
+  if ((el = c('[data-sm-tipo]'))) {
+    const t = el.dataset.smTipo;
+    $$('[data-sm-tipo]').forEach(b => b.setAttribute('aria-selected', String(b === el)));
+    $$('[data-sm-form]').forEach(f => { f.hidden = f.dataset.smForm !== t; });
+    $('[data-sm-err]').textContent = '';
+    const i = $(`[data-sm-form="${t}"] input, [data-sm-form="${t}"] select`); if (i) i.focus();
+    return;
+  }
+  if (c('[data-sm-copiar]')) {
+    try { await navigator.clipboard.writeText(S.club.link); avisar('Link copiado'); } catch (e) { avisar('No se pudo copiar: seleccionalo a mano', 'error'); }
+    return;
+  }
+  if (c('[data-sm-qr]')) { const b = $('[data-sm-qrbox]'); if (b) b.hidden = !b.hidden; return; }
+  if ((el = c('[data-sm-nuevolink]'))) {
+    if (!el.dataset.seguro) { el.dataset.seguro = '1'; el.textContent = '¿Seguro? El link viejo deja de andar'; setTimeout(() => { if (el.isConnected) { delete el.dataset.seguro; el.textContent = 'Generar link nuevo'; } }, 4000); return; }
+    editarSocio({ nuevoLink: true }, 'Link nuevo generado: mandáselo de nuevo');
+    return;
+  }
+  if ((el = c('[data-sm-estado]'))) {
+    const est = el.dataset.smEstado;
+    if (est === 'baja' && !el.dataset.seguro) { el.dataset.seguro = '1'; el.textContent = '¿Seguro? Su credencial deja de andar'; return; }
+    editarSocio({ estado: est }, est === 'baja' ? 'Socio dado de baja' : 'Socio reactivado');
+    return;
+  }
+  if ((el = c('[data-mov-borrar]'))) {
+    if (!el.dataset.seguro) { el.dataset.seguro = '1'; el.textContent = '¿Anular?'; setTimeout(() => { if (el.isConnected) { delete el.dataset.seguro; el.textContent = '✕'; } }, 4000); return; }
+    try { await post('/api/admin/movimientos/' + el.dataset.movBorrar, {}, 'DELETE'); avisar('Movimiento anulado'); abrirSocio(S.club.socio, true); if (S.tab === 'club') cargarClub(true); }
+    catch (e) { avisar(e.message, 'error'); }
+    return;
+  }
+  if (c('[data-cp-nuevo]')) { S.club.edit.premios.push({ nombre: '', puntos: 100 }); pintarReglas(); const i = $$('[data-cp$="|nombre"]').pop(); if (i) i.focus(); return; }
+  if ((el = c('[data-cp-quitar]'))) { S.club.edit.premios.splice(+el.dataset.cpQuitar, 1); pintarReglas(); return; }
+  if (c('[data-cb-nuevo]')) { S.club.edit.beneficios.push(''); pintarReglas(); const i = $$('[data-cb]').pop(); if (i) i.focus(); return; }
+  if ((el = c('[data-cb-quitar]'))) { S.club.edit.beneficios.splice(+el.dataset.cbQuitar, 1); pintarReglas(); return; }
+  if (c('[data-cr-guardar]')) { guardarReglas(); return; }
+  if (c('[data-cr-reset]')) { const k = S.club.cfg; S.club.edit = { pesosPorPunto: k.pesosPorPunto, premios: k.premios.map(p => ({ ...p })), beneficios: k.beneficios.slice() }; pintarReglas(); avisar('Cambios descartados'); return; }
+
   /* estados rápidos (no abren el detalle) */
   if ((el = c('[data-est-res]'))) { ev.stopPropagation(); const [id, est] = el.dataset.estRes.split('|'); cambiarEstadoReserva(+id, est); return; }
   if ((el = c('[data-ped-est]'))) {
     const [id, est] = el.dataset.pedEst.split('|');
-    try { await post('/api/admin/pedidos/' + id, { estado: est }, 'PATCH'); avisar(ESTADO_PED[est]); cerrarModal(); refrescarSuave(); } catch (e) { avisar(e.message, 'error'); }
+    try {
+      const r = await post('/api/admin/pedidos/' + id, { estado: est }, 'PATCH');
+      const p = [...S.pedDia, ...S.pedidos].find(x => x.id === +id);
+      avisar(ESTADO_PED[est] + (p && p.socio && est === 'entregado' ? ` · +${p.puntos} puntos a ${p.socio.nombre}` : ''));
+      if (r.aviso) avisar(r.aviso, 'error');
+      cerrarModal(); refrescarSuave();
+    } catch (e) { avisar(e.message, 'error'); }
     return;
   }
   if ((el = c('[data-borrar-ped]'))) {
@@ -1009,6 +1351,26 @@ document.addEventListener('input', ev => {
     $('[data-s-plano]').innerHTML = planoBase(S.edit.map(x => mesaSVG(x, { estado: 'editar', sub: x.personas + ' PERS.' })).join(''));
   }
   if (t.matches('[data-ss]')) S.editSet[t.dataset.ss] = +t.value;
+  /* club */
+  if (t.matches('[data-c-q]')) ap(S.club, 'q', t.value, () => cargarClub(true), 300);
+  if (t.matches('[data-cr]')) { S.club.edit.pesosPorPunto = t.value; const e = $('[data-cr-ej]'); if (e) e.textContent = ejemploPuntos(); }
+  if (t.matches('[data-cp]')) { const [i, k] = t.dataset.cp.split('|'); S.club.edit.premios[+i][k] = k === 'puntos' ? +t.value : t.value; }
+  if (t.matches('[data-cb]')) S.club.edit.beneficios[+t.dataset.cb] = t.value;
+  if (t.matches('[data-sm-form="compra"] [name="monto"]')) {
+    const ppp = (S.club.cfg && S.club.cfg.pesosPorPunto) || 1000, n = Math.floor((+t.value || 0) / ppp);
+    $('[data-sm-calc]').textContent = t.value ? `Suma ${n} ${n === 1 ? 'punto' : 'puntos'}.` : '';
+  }
+});
+document.addEventListener('submit', ev => {
+  const f = ev.target;
+  if (f.matches('[data-sm-form]')) { ev.preventDefault(); movimientoSocio(f); return; }
+  if (f.matches('[data-form-buscar-socio]')) { ev.preventDefault(); buscarSocioQR(f.elements.n.value); return; }
+  if (f.matches('[data-sm-datos]')) {
+    ev.preventDefault();
+    const v = n => f.elements[n].value, cumple = v('cumple').trim();
+    if (cumple && !deCumple(cumple)) { $('[data-sm-err2]').textContent = 'El cumpleaños va como DD/MM (por ejemplo 15/03).'; return; }
+    editarSocio({ nombre: v('nombre'), tel: v('tel'), email: v('email'), cumple: deCumple(cumple), nota: v('nota') }, 'Datos guardados');
+  }
 });
 
 /* ══════════════ arranque ══════════════ */
