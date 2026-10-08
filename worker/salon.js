@@ -20,13 +20,11 @@ const CONFIG_BASE = {
     // desde las 17:00 no hay horarios cada 30 min: solo los turnos de la noche
     turnosNoche: [1200, 1290, 1380],
     // 20:00, 21:30 y 23:00
-    juntarHasta: 2,
-    // solo se pueden juntar mesas de hasta esta capacidad (las de 2)
     juntarMax: 2,
-    // cuántas mesas se pueden juntar como máximo
+    // cuántas mesas se pueden juntar como máximo (solo las marcadas `unible`)
     juntarCabezales: 2,
     // lugares extra en los cabezales de las mesas juntas (2 mesas de 2 = 4 + 2 = 6)
-    juntarDist: 4
+    juntarDist: 12.5
     // distancia máxima entre bordes (en el plano) para considerarlas juntas
   },
   // minutos desde las 00:00 del día de servicio; 1470 = 00:30 de la madrugada siguiente
@@ -40,24 +38,26 @@ const CONFIG_BASE = {
     6: [[690, 1470]]
   },
   mesas: [
-    { id: "9", personas: 2, forma: "rect", giro: 0, x: 11, y: 20 },
-    { id: "10", personas: 4, forma: "rect", giro: 0, x: 34, y: 26 },
-    { id: "12", personas: 2, forma: "rect", giro: 0, x: 54.5, y: 21 },
-    { id: "18", personas: 8, forma: "rect", giro: 90, x: 76, y: 43 },
-    { id: "8", personas: 2, forma: "rect", giro: 0, x: 11.5, y: 41 },
-    { id: "13", personas: 2, forma: "rect", giro: 0, x: 54.5, y: 43 },
-    { id: "11", personas: 4, forma: "rect", giro: 90, x: 33, y: 57 },
-    { id: "7", personas: 2, forma: "rect", giro: 0, x: 12, y: 61 },
-    { id: "14", personas: 2, forma: "rect", giro: 0, x: 54.5, y: 62 },
-    { id: "3", personas: 2, forma: "redonda", giro: 0, x: 26, y: 81 },
-    { id: "2", personas: 2, forma: "redonda", giro: 0, x: 39, y: 81 },
-    { id: "1", personas: 2, forma: "redonda", giro: 0, x: 52, y: 81 },
-    { id: "4", personas: 2, forma: "rect", giro: 0, x: 66, y: 90 },
-    { id: "15", personas: 3, forma: "redonda", giro: 0, x: 18, y: 92 },
-    { id: "5", personas: 2, forma: "rect", giro: 0, x: 76, y: 102 },
-    { id: "16", personas: 3, forma: "redonda", giro: 0, x: 26, y: 108 },
-    { id: "17", personas: 2, forma: "redonda", giro: 0, x: 12, y: 121.5 },
-    { id: "6", personas: 8, forma: "rect", giro: 90, x: 91.5, y: 114 }
+    // el plano tal cual está en el sitio publicado (8/10/2026)
+    { id: "9", personas: 2, forma: "rect", giro: 0, unible: true, x: 11, y: 20 },
+    { id: "10", personas: 4, forma: "rect", giro: 0, unible: false, x: 34, y: 26 },
+    { id: "12", personas: 2, forma: "rect", giro: 0, unible: true, x: 54.5, y: 21 },
+    { id: "18", personas: 8, forma: "rect", giro: 90, unible: false, x: 76, y: 43 },
+    { id: "8", personas: 2, forma: "rect", giro: 0, unible: true, x: 11.5, y: 41 },
+    { id: "13", personas: 2, forma: "rect", giro: 0, unible: true, x: 54.5, y: 43 },
+    { id: "11", personas: 4, forma: "rect", giro: 90, unible: false, x: 33, y: 57 },
+    { id: "7", personas: 2, forma: "rect", giro: 0, unible: true, x: 12, y: 61 },
+    { id: "14", personas: 2, forma: "rect", giro: 0, unible: true, x: 54.5, y: 62 },
+    { id: "3", personas: 2, forma: "redonda", giro: 0, unible: false, x: 26, y: 81 },
+    { id: "2", personas: 2, forma: "redonda", giro: 0, unible: false, x: 39, y: 81 },
+    { id: "1", personas: 2, forma: "redonda", giro: 0, unible: false, x: 52, y: 81 },
+    { id: "4", personas: 2, forma: "rect", giro: 0, unible: false, x: 66, y: 90 },
+    { id: "15", personas: 3, forma: "redonda", giro: 0, unible: false, x: 18, y: 92 },
+    { id: "5", personas: 2, forma: "rect", giro: 0, unible: false, x: 76, y: 102 },
+    { id: "16", personas: 3, forma: "redonda", giro: 0, unible: false, x: 26, y: 108 },
+    { id: "17", personas: 2, forma: "redonda", giro: 0, unible: false, x: 12, y: 121.5 },
+    { id: "6", personas: 8, forma: "rect", giro: 90, unible: false, x: 91.5, y: 114 },
+    { id: "19", personas: 4, forma: "rect", giro: 0, unible: false, x: 80, y: 71 }
   ]
 };
 class ErrorHttp extends Error {
@@ -232,7 +232,7 @@ export class Salon extends DurableObject {
       return;
     }
     if (ms.length > s.juntarMax) throw new ErrorHttp(400, `Se pueden juntar hasta ${s.juntarMax} mesas`, "juntar");
-    if (ms.some((m) => m.personas > s.juntarHasta)) throw new ErrorHttp(400, "Esas mesas no se pueden juntar", "juntar");
+    if (ms.some((m) => !m.unible)) throw new ErrorHttp(400, "Esas mesas no se pueden juntar", "juntar");
     const vistas = new Set([ms[0].id]), cola = [ms[0]];
     while (cola.length) {
       const a = cola.pop();
@@ -441,7 +441,6 @@ export class Salon extends DurableObject {
         pasoMin: c.settings.pasoMin,
         diasAdelante: c.settings.diasAdelante,
         anticipacionMin: c.settings.anticipacionMin,
-        juntarHasta: c.settings.juntarHasta,
         juntarMax: c.settings.juntarMax,
         juntarCabezales: c.settings.juntarCabezales,
         juntarDist: c.settings.juntarDist
@@ -819,7 +818,7 @@ export class Salon extends DurableObject {
       const forma = m.forma === "redonda" ? "redonda" : "rect";
       const giro = forma === "rect" && Number(m.giro) === 90 ? 90 : 0;
       ids.add(id);
-      limpias.push({ id, personas, forma, giro, x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10 });
+      limpias.push({ id, personas, forma, giro, unible: !!m.unible, x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10 });
     }
     const hoy = ahoraServicio().fecha;
     const quitadas = actual.mesas.filter((m) => !ids.has(m.id)).map((m) => m.id);
