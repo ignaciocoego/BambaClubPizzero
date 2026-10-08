@@ -27,15 +27,15 @@ const CONFIG_BASE = {
     juntarDist: 12.5
     // distancia máxima entre bordes (en el plano) para considerarlas juntas
   },
-  // minutos desde las 00:00 del día de servicio; 1470 = 00:30 de la madrugada siguiente
+  // minutos desde las 00:00 del día de servicio; 1470 = 00:30 y 1500 = 01:00 de la madrugada siguiente
   horarios: {
-    0: [[690, 1470]],
-    1: [],
-    2: [[690, 930], [1050, 1470]],
-    3: [[690, 930], [1050, 1470]],
-    4: [[690, 930], [1050, 1470]],
-    5: [[690, 930], [1050, 1470]],
-    6: [[690, 1470]]
+    0: [[720, 1470]], // domingo 12:00 a 00:30
+    1: [],            // lunes cerrado
+    2: [[720, 1470]], // martes 12:00 a 00:30
+    3: [[720, 1470]], // miércoles 12:00 a 00:30
+    4: [[720, 1470]], // jueves 12:00 a 00:30
+    5: [[720, 1500]], // viernes 12:00 a 01:00
+    6: [[720, 1500]]  // sábado 12:00 a 01:00
   },
   mesas: [
     // el plano tal cual está en el sitio publicado (8/10/2026)
@@ -171,14 +171,15 @@ export class Salon extends DurableObject {
     }
     this.cfg = {
       settings: { ...CONFIG_BASE.settings, ...guardada.settings || {} },
-      horarios: guardada.horarios || CONFIG_BASE.horarios,
+      // los horarios del local salen siempre del código: si quedaron guardados de antes, no pisan los nuevos
+      horarios: CONFIG_BASE.horarios,
       mesas: Array.isArray(guardada.mesas) && guardada.mesas.length ? guardada.mesas : CONFIG_BASE.mesas
     };
     return this.cfg;
   }
   guardarConfig(cfg) {
     this.sql.exec(`INSERT INTO config (k, v) VALUES ('cfg', ?) ON CONFLICT(k) DO UPDATE SET v=excluded.v`, JSON.stringify(cfg));
-    this.cfg = cfg;
+    this.cfg = null;
   }
   /* Al mediodía y a la tarde los horarios salen cada 30 min; de noche (desde nocheDesde) solo los turnos fijos. */
   turnos(fecha) {

@@ -41,9 +41,8 @@
   "sameAs": ["https://www.instagram.com/bamba.clubpizzero/"],
   "acceptsReservations": "True",
   "openingHoursSpecification": [
-    { "@type": "OpeningHoursSpecification", "dayOfWeek": ["Tuesday","Wednesday","Thursday","Friday"], "opens": "11:30", "closes": "15:30" },
-    { "@type": "OpeningHoursSpecification", "dayOfWeek": ["Tuesday","Wednesday","Thursday","Friday"], "opens": "17:30", "closes": "00:30" },
-    { "@type": "OpeningHoursSpecification", "dayOfWeek": ["Saturday","Sunday"], "opens": "11:30", "closes": "00:30" }
+    { "@type": "OpeningHoursSpecification", "dayOfWeek": ["Tuesday","Wednesday","Thursday","Sunday"], "opens": "12:00", "closes": "00:30" },
+    { "@type": "OpeningHoursSpecification", "dayOfWeek": ["Friday","Saturday"], "opens": "12:00", "closes": "01:00" }
   ]
 }
 </script>
@@ -697,8 +696,8 @@ body.splash-activo{overflow:hidden}
           <span class="punto" data-punto></span>
           <span data-estado>Martes a domingo</span>
         </p>
-        <p class="local__hs">Mar a vie · 11:30–15:30 y 17:30–00:30</p>
-        <p class="local__hs">Sáb y dom · 11:30–00:30 · Lunes cerrado</p>
+        <p class="local__hs">Mar, mié, jue y dom · 12:00–00:30</p>
+        <p class="local__hs">Vie y sáb · 12:00–01:00 · Lunes cerrado</p>
       </div>
       <div class="local__acc">
         <a href="https://www.google.com/maps/search/?api=1&amp;query=Monse%C3%B1or+Piaggio+98+Avellaneda+Buenos+Aires" target="_blank" rel="noopener">Cómo llegar ↗</a>
@@ -906,30 +905,37 @@ const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c =>
 
 /* ══════════════════════════════════════════════════════════
    ESTADO DEL LOCAL
-   Mar a vie: 11:30–15:30 y 17:30–00:30 (dos turnos).
-   Sáb y dom: 11:30–00:30 corrido. Lunes cerrado.
-   La franja nocturna cruza la medianoche: hasta las 00:30
-   se sigue contando como servicio del día anterior.
+   Mar, mié, jue y dom: 12:00–00:30. Vie y sáb: 12:00–01:00.
+   Lunes cerrado. El cierre cruza la medianoche: hasta las
+   00:30 (o la 01:00) se sigue contando como servicio del día
+   anterior. Se calcula con la hora de Argentina (UTC−3), sin
+   importar la zona horaria del teléfono.
    ══════════════════════════════════════════════════════════ */
+// minutos desde las 00:00 del día de servicio (1470 = 00:30 y 1500 = 01:00 del día siguiente); igual que en el Worker
+const HORARIO = { 0:[720, 1470], 1:null, 2:[720, 1470], 3:[720, 1470], 4:[720, 1470], 5:[720, 1500], 6:[720, 1500] };
+const DIAS_L = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+const horaTxt = m => { const h = Math.floor(m / 60) % 24, mm = String(m % 60).padStart(2, '0'); return (h === 1 ? 'la ' : 'las ') + String(h).padStart(2, '0') + ':' + mm; };
 function estado() {
-  const d = new Date();
-  const real = d.getDay();
-  const mins = d.getHours() * 60 + d.getMinutes();
-  const madrugada = mins < 30; // 00:00–00:29
-  const dia = madrugada ? (real + 6) % 7 : real;
-  const t = madrugada ? mins + 24 * 60 : mins;
+  const ar = new Date(Date.now() - 3 * 3600 * 1000);   // hora de Argentina leída con getUTC*
+  const real = ar.getUTCDay();
+  const mins = ar.getUTCHours() * 60 + ar.getUTCMinutes();
 
-  if (dia === 1) return { label:'Hoy cerrado · abrimos martes 11:30', dot:'#FF8A7A' };
+  // ¿sigue el servicio de anoche? (madrugada)
+  const ayer = HORARIO[(real + 6) % 7];
+  if (ayer && mins + 1440 < ayer[1]) return { label:'Abierto ahora · hasta ' + horaTxt(ayer[1]), dot:'#3DDC84' };
 
-  const finde = dia === 0 || dia === 6;
-  if (finde) {
-    if (t >= 11 * 60 + 30 && t < 24 * 60 + 30) return { label:'Abierto ahora · hasta las 00:30', dot:'#3DDC84' };
-    return { label:'Cerrado · abrimos hoy 11:30', dot:'#FFCF5C' };
+  const hoy = HORARIO[real];
+  if (hoy && mins >= hoy[0] && mins < hoy[1]) return { label:'Abierto ahora · hasta ' + horaTxt(hoy[1]), dot:'#3DDC84' };
+  if (hoy && mins < hoy[0]) return { label:'Cerrado · abrimos hoy a ' + horaTxt(hoy[0]), dot:'#FFCF5C' };
+
+  // cerrado hasta otro día: buscamos el próximo que abre
+  for (let i = 1; i <= 7; i++) {
+    const h = HORARIO[(real + i) % 7];
+    if (!h) continue;
+    const cuando = i === 1 ? 'mañana' : 'el ' + DIAS_L[(real + i) % 7];
+    return { label:(hoy ? 'Cerrado' : 'Hoy cerrado') + ' · abrimos ' + cuando + ' a ' + horaTxt(h[0]), dot:hoy ? '#FFCF5C' : '#FF8A7A' };
   }
-  if (t >= 11 * 60 + 30 && t < 15 * 60 + 30) return { label:'Abierto ahora · hasta las 15:30', dot:'#3DDC84' };
-  if (t >= 17 * 60 + 30 && t < 24 * 60 + 30) return { label:'Abierto ahora · hasta las 00:30', dot:'#3DDC84' };
-  if (t >= 15 * 60 + 30 && t < 17 * 60 + 30) return { label:'Cerrado · reabrimos hoy 17:30', dot:'#FFCF5C' };
-  return { label:'Cerrado · abrimos hoy 11:30', dot:'#FFCF5C' };
+  return { label:'Martes a domingo', dot:'#FFCF5C' };
 }
 function pintarEstado() {
   const e = estado();
