@@ -843,6 +843,11 @@ body.splash-activo{overflow:hidden}
 
 const WA = '5491138693024';
 
+/* sacable: la ficha deja sacar ingredientes (el precio no cambia).
+   personalizable:false (en la sección o en el plato): ni sacar ni agregar nada, aunque tenga `ing`.
+   porcionable: las pizzas de la sección se pueden vender por porción. Cuáles sí y a qué precio lo
+   decide el dueño en el panel (pestaña Carta); las variantes "Por porción" de acá son el valor por
+   defecto si el sistema no responde. */
 const MENU = [
   { id:'mas-alla', sacable:true, title:'MÁS ALLÁ DE LA PIZZA', color:'azul', items:[
     { id:'faina', name:'Faina', price:2000 },
@@ -851,7 +856,7 @@ const MENU = [
     { id:'panuozzo', ingVariante:true, name:'Panuozzo (sándwich)', price:14000, desc:'Elegí tu relleno.', variantLabel:'Relleno',
       variants:[{name:'Mortadella, stracciatella, pesto, pistacchio',price:14000},{name:'Crudo, stracciatella, rúcula, pesto',price:14000}] },
   ]},
-  { id:'empanadas', sacable:true, title:'EMPANADAS', color:'rojo', items:[
+  { id:'empanadas', personalizable:false, title:'EMPANADAS', color:'rojo', items:[
     { id:'e-carne', name:'Carne', price:3500, variantLabel:'Cocción', variants:[{name:'Horneada',price:3500},{name:'Frita',price:3500}] },
     { id:'e-jamonqueso', name:'Jamón y queso', price:3500, variantLabel:'Cocción', variants:[{name:'Horneada',price:3500},{name:'Frita',price:3500}] },
     { id:'e-pollo', name:'Pollo', price:3500 },
@@ -873,7 +878,7 @@ const MENU = [
     { id:'patate', ing:['Fior di latte','Papas','Romero','Pimienta','Parmesano'], name:'Patate', price:21000, desc:'Fior di latte, papas, romero, pimienta, parmesano.' },
     { id:'bamba', ing:['Fior di latte','Roquefort','Brie','Nueces','Miel'], name:'Bamba', price:26000, desc:'Fior di latte, roquefort, brie, nueces, miel.' },
   ]},
-  { id:'al-molde', sacable:true, title:'BAMBA AL MOLDE', badge:'ESTILO ARGENTO', color:'azul', items:[
+  { id:'al-molde', sacable:true, porcionable:true, title:'BAMBA AL MOLDE', badge:'ESTILO ARGENTO', color:'azul', items:[
     { id:'muzzarella', mitad:true, name:'Muzzarella', price:22000, variantLabel:'Presentación', variants:[{name:'Pizza entera',price:22000},{name:'Por porción',price:3500}] },
     { id:'jamonmorron', mitad:true, name:'Jamón y morrón', price:30500, variantLabel:'Presentación', variants:[{name:'Pizza entera',price:30500},{name:'Por porción',price:4500}] },
     { id:'napolitanaam', mitad:true, name:'Napolitana', price:29500, variantLabel:'Presentación', variants:[{name:'Pizza entera',price:29500},{name:'Por porción',price:4500}] },
@@ -1015,9 +1020,67 @@ function tarjetaMitad() {
   </div>`;
 }
 
+/* ══════════════════════════════════════════════════════════
+   PORCIONES
+   Qué pizzas al molde se venden por porción (y a qué precio) lo
+   decide el dueño en el panel. Se lee de /api/carta; si no hay
+   conexión se usa lo último que se vio, o lo que dice MENU.
+   ══════════════════════════════════════════════════════════ */
+const PORCION = 'Por porción';
+const LS_CARTA = 'bamba_carta_v1';
+const porcionDe = it => it.variants && it.variants.find(v => v.name === PORCION);
+function aplicarPorciones(lista) {
+  if (!Array.isArray(lista)) return false;
+  let cambio = false;
+  for (const sec of MENU) {
+    if (!sec.porcionable) continue;
+    for (const it of sec.items) {
+      const c = lista.find(x => x && x.id === it.id);
+      if (!c) continue;
+      const antes = JSON.stringify(it.variants || null);
+      if (c.porcion && c.precio > 0) {
+        it.variantLabel = 'Presentación';
+        it.variants = [{ name:'Pizza entera', price:it.price }, { name:PORCION, price:c.precio }];
+      } else if (it.variants && it.variantLabel === 'Presentación') {
+        delete it.variants; delete it.variantLabel;
+      }
+      if (JSON.stringify(it.variants || null) !== antes) cambio = true;
+    }
+  }
+  return cambio;
+}
+/* Si el pedido guardado tiene porciones que ya no se venden o cambiaron de precio, se acomoda. */
+function revisarCarrito() {
+  let quitadas = 0, cambio = false;
+  cart = cart.filter(l => {
+    if (l.variant !== PORCION) return true;
+    const it = MENU.flatMap(s => s.items).find(i => i.id === l.id), v = it && porcionDe(it);
+    if (!v) { quitadas++; return false; }
+    if (l.unit !== v.price) { l.unit = v.price; cambio = true; }
+    return true;
+  });
+  if (quitadas || cambio) { guardar(); pintarBarra(); if (!$('[data-modal-pedido]').hidden) pintarPedido(); }
+  if (quitadas) avisar(quitadas === 1 ? 'Sacamos una porción que ya no se vende' : 'Sacamos porciones que ya no se venden');
+}
+async function cargarPorciones() {
+  let guardada = null;
+  try { guardada = JSON.parse(localStorage.getItem(LS_CARTA)); } catch (e) {}
+  if (guardada && aplicarPorciones(guardada)) { pintarCarta(); revisarCarrito(); }
+  if (!/^https?:$/.test(location.protocol)) return;
+  try {
+    const r = await fetch('/api/carta', { cache:'no-store' });
+    const d = await r.json();
+    if (!d.ok) return;
+    try { localStorage.setItem(LS_CARTA, JSON.stringify(d.porciones)); } catch (e) {}
+    if (aplicarPorciones(d.porciones)) pintarCarta();
+    revisarCarrito();
+  } catch (e) {}
+}
+
 function pintarCarta() {
-  $('[data-cats]').innerHTML = MENU.map((s, i) => `
-    <button class="chip" type="button" role="tab" data-cat="${s.id}" aria-selected="${i === 0}">${esc(s.title)}</button>`).join('');
+  const activa = catActiva;
+  $('[data-cats]').innerHTML = MENU.map(s => `
+    <button class="chip" type="button" role="tab" data-cat="${s.id}" aria-selected="${s.id === activa}">${esc(s.title)}</button>`).join('');
 
   $('[data-secciones]').innerHTML = MENU.map(sec => `
     <div class="grupo" id="${sec.id}" style="color:var(--${sec.color})">
@@ -1037,6 +1100,7 @@ function pintarCarta() {
             </span>
             <span class="plato__pre">
               <span class="plato__val" style="display:block">${plata(base)}</span>
+              ${porcionDe(it) ? `<span class="plato__nota" style="display:block">porción ${plata(porcionDe(it).price)}</span>` : ''}
             </span>
             <span class="plato__mas" aria-hidden="true">+</span>
           </button>`;
@@ -1089,7 +1153,11 @@ function ingredientesDe(prod, variante) {
   if (prod.ingVariante && prod.variants) return prod.variants[variante].name.split(/,\s*/).map(x => x.charAt(0).toUpperCase() + x.slice(1));
   return null;
 }
-const puedeSacar = () => ficha.kind === 'mitad' || !!(ficha.sec && ficha.sec.sacable) || !!(ficha.prod && ficha.prod.ing);
+const puedeSacar = () => {
+  if (ficha.kind === 'mitad') return true;
+  if ((ficha.sec && ficha.sec.personalizable === false) || (ficha.prod && ficha.prod.personalizable === false)) return false;
+  return !!(ficha.sec && ficha.sec.sacable) || !!(ficha.prod && ficha.prod.ing);
+};
 
 function htmlSacar() {
   const ing = ficha.kind === 'mitad' ? null : ingredientesDe(ficha.prod, ficha.variant);
@@ -1343,7 +1411,7 @@ function registrarPedido() {
       method:'POST', keepalive:true, headers:{ 'content-type':'application/json' },
       body:JSON.stringify({ ref:refPedido, socio:comoSocio && socio ? socio.token : undefined,
         nombre:datosForm.nombre, tel:datosForm.tel, modo, pago, horario:datosForm.hora,
-        nota:datosForm.nota, items:cart.map(l => ({ name:l.name, variant:l.variant, sacar:(l.sacar || []).join(', '), nota:l.nota, qty:l.qty, unit:l.unit })) }),
+        nota:datosForm.nota, items:cart.map(l => ({ id:l.id, name:l.name, variant:l.variant, sacar:(l.sacar || []).join(', '), nota:l.nota, qty:l.qty, unit:l.unit })) }),
     }).catch(() => {});
   } catch (e) {}
 }
@@ -1910,6 +1978,7 @@ function conectar() {
     else if (m.t === 'holds') { RES.holds = (m.holds || []).map(h => ({ ...h, rec:Date.now() })); pintarSala(); }
     else if (m.t === 'cambio') { if (m.fecha === RES.fecha) { clearTimeout(RES.refrescoT); RES.refrescoT = setTimeout(refrescarEnVivo, 150); } }
     else if (m.t === 'salon') { recargarSalon(); }
+    else if (m.t === 'carta') { cargarPorciones(); }
   };
   ws.onclose = () => {
     clearInterval(RES.pingT);
@@ -2092,6 +2161,7 @@ pintarBarra();
 iniciarSplash();
 observarReservas();
 iniciarClub();
+cargarPorciones();
 window.addEventListener('scroll', spy, { passive:true });
 setInterval(pintarEstado, 60000);
 })();
