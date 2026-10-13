@@ -101,6 +101,11 @@ export default {
     }
     // Club Bamba: datos del programa y de la credencial del socio
     if (ruta === "/api/club/info") return salon.fetch(request);
+    if (ruta === "/api/club/alta" || ruta === "/api/club/entrar") {
+      const tope = ruta === "/api/club/alta" ? ["alta", 5, 600] : ["entrar", 8, 600];
+      if (!await salon.limite(tope[0] + ":" + ip, tope[1], tope[2])) return json({ ok: false, error: "Demasiados intentos seguidos. Esperá unos minutos.", code: "tope" }, 429);
+      return salon.fetch(request);
+    }
     if (ruta === "/api/club/yo") {
       if (!await salon.limite("club:" + ip, 120, 600)) return json({ ok: false, error: "Demasiados intentos seguidos. Esperá unos minutos.", code: "tope" }, 429);
       return salon.fetch(request);

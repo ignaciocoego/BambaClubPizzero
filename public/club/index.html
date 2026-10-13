@@ -164,6 +164,16 @@ a{color:inherit}
 .portada__lock .club{width:63%;margin:5.4% auto 0}
 .portada__sello{display:inline-block;margin:22px 0 14px;font-size:20px;padding:10px 24px}
 .portada p{font-size:14.5px;max-width:34ch;margin:0 auto;opacity:.95}
+.seg{display:grid;grid-template-columns:1fr 1fr;gap:4px;background:var(--linea);border-radius:13px;padding:4px}
+.seg button{border-radius:10px;padding:11px 6px;font-size:13px;font-weight:800;color:var(--gris)}
+.seg button[aria-selected="true"]{background:var(--papel);color:var(--rojo);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.form-club{display:flex;flex-direction:column;gap:9px}
+.dato{width:100%;font:inherit;font-size:16px;border:1.5px solid var(--linea);border-radius:12px;padding:13px 14px;background:var(--papel);color:var(--tinta)}
+.dato:focus{outline:none;border-color:var(--azul)}
+.error{color:var(--rojo);font-size:13px;font-weight:700;min-height:0}
+.error:empty{display:none}
+.nota-club{font-size:12.5px;color:var(--gris);text-align:center}
+.aviso--ok{background:#E3F5EA;color:#14532F}
 .carga{padding:60px 20px;text-align:center;color:var(--gris)}
 
 /* hoja de instrucciones */
@@ -334,7 +344,8 @@ if (!esIOS) addEventListener('deviceorientation', ev => { if (ev.gamma == null |
 /* ══════════════ vistas ══════════════ */
 const iconoGW = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="3" fill="#4285F4"/><rect x="2" y="9" width="20" height="10" rx="3" fill="#34A853"/><rect x="2" y="13" width="20" height="6" rx="3" fill="#FBBC04"/><rect x="2" y="16" width="20" height="3" rx="1.5" fill="#EA4335"/></svg>';
 
-let volteada = false, animado = false;
+let volteada = false, animado = false, bienvenida = null;
+try { bienvenida = sessionStorage.getItem('bamba_bienvenida'); sessionStorage.removeItem('bamba_bienvenida'); } catch (e) {}
 const GIRAR = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 0 1 15.5-6.2L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15.5 6.2L3 16"/><path d="M3 21v-5h5"/></svg>';
 function girar() {
   volteada = !volteada;
@@ -404,6 +415,7 @@ function pintarCredencial(d, sinConexion) {
       </div></div>
       <button class="girar" type="button" data-girar data-girar-txt>${GIRAR}${volteada ? 'Ver el QR' : 'Dar vuelta la credencial'}</button>
     </section>
+    ${bienvenida ? `<p class="aviso aviso--ok">¡Listo, ya sos del Club Bamba! Tu número de socio es el <b>${esc(bienvenida)}</b>: anotalo, sirve para abrir tu credencial desde otro celular.</p>` : ''}
     ${sinConexion ? `<p class="aviso">Sin conexión: puntos al ${esc(fechaHora(sinConexion))}. El QR sirve igual.</p>` : ''}
 
     <section class="puntos" aria-label="Tus puntos">
@@ -473,8 +485,26 @@ function pintarPortada(info) {
       <p>Sumá puntos con cada pedido y canjealos por pizzas, postres y birras.</p>
     </section>
     <div class="acciones" style="margin-top:18px">
-      <a class="btn btn--wa" href="https://wa.me/${WA}?text=${encodeURIComponent('¡Hola! Quiero hacerme socio del Club Bamba.')}" target="_blank" rel="noopener">Quiero ser socio</a>
-      <p style="font-size:12.5px;color:var(--gris);text-align:center">Te damos de alta en el local o por WhatsApp y te mandamos el link de tu credencial.</p>
+      <div class="seg" role="tablist">
+        <button type="button" role="tab" data-modo-club="alta" aria-selected="${modoClub === 'alta'}">Quiero ser socio</button>
+        <button type="button" role="tab" data-modo-club="entrar" aria-selected="${modoClub === 'entrar'}">Ya soy socio</button>
+      </div>
+      ${modoClub === 'alta' ? `
+      <form class="form-club" data-form-alta>
+        <input class="dato" name="nombre" placeholder="Nombre y apellido" autocomplete="name" required maxlength="60">
+        <input class="dato" name="tel" type="tel" inputmode="tel" placeholder="Teléfono (WhatsApp)" autocomplete="tel" required>
+        <input class="dato" name="cumple" inputmode="numeric" placeholder="Cumpleaños DD/MM (opcional)" maxlength="5">
+        <p class="error" data-club-error></p>
+        <button class="btn btn--rojo" type="submit">Hacerme socio</button>
+        <p class="nota-club">Es gratis. Al toque tenés tu credencial con QR.</p>
+      </form>` : `
+      <form class="form-club" data-form-entrar>
+        <input class="dato" name="tel" type="tel" inputmode="tel" placeholder="Tu teléfono" autocomplete="tel" required>
+        <input class="dato" name="numero" inputmode="numeric" placeholder="Tu número de socio (ej: 0042)" required maxlength="6">
+        <p class="error" data-club-error></p>
+        <button class="btn btn--rojo" type="submit">Abrir mi credencial</button>
+        <p class="nota-club">El número está en tu credencial, abajo de tu nombre. ¿No lo tenés? <a href="https://wa.me/${WA}?text=${encodeURIComponent('¡Hola! Necesito el link de mi credencial del Club Bamba.')}" target="_blank" rel="noopener">Pedilo por WhatsApp</a>.</p>
+      </form>`}
     </div>
     ${info ? `
     <section class="sec">
@@ -488,7 +518,27 @@ function pintarPortada(info) {
       <h2 class="sec__tit">PREMIOS</h2>
       <div class="lista">${premios.map(p => `<div class="premio"><p class="premio__pts">${p.puntos}<small>PUNTOS</small></p><div><p class="premio__nom">${esc(p.nombre)}</p></div></div>`).join('')}</div>
     </section>` : ''}
-    <footer class="pie"><p>¿Ya sos socio? Abrí el link que te mandamos por WhatsApp.</p></footer>`;
+  `;
+}
+let modoClub = location.hash === '#entrar' ? 'entrar' : 'alta', infoClub = null;
+async function enviarClub(f) {
+  const err = $('[data-club-error]'), btn = f.querySelector('[type=submit]'), v = n => f.elements[n] ? f.elements[n].value.trim() : '';
+  err.textContent = '';
+  let cuerpo, ruta;
+  if (f.matches('[data-form-alta]')) {
+    const c = v('cumple'), m = /^(\d{1,2})\/(\d{1,2})$/.exec(c);
+    if (c && !(m && +m[1] >= 1 && +m[1] <= 31 && +m[2] >= 1 && +m[2] <= 12)) { err.textContent = 'El cumpleaños va como DD/MM (por ejemplo 15/03).'; return; }
+    ruta = '/api/club/alta'; cuerpo = { nombre: v('nombre'), tel: v('tel'), cumple: m ? String(m[2]).padStart(2, '0') + '-' + String(m[1]).padStart(2, '0') : '' };
+  } else { ruta = '/api/club/entrar'; cuerpo = { tel: v('tel'), numero: v('numero') }; }
+  btn.disabled = true;
+  try {
+    const r = await fetch(ruta, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(cuerpo) });
+    const j = await r.json().catch(() => null);
+    if (!r.ok || !j || !j.ok) { err.textContent = (j && j.error) || 'No pudimos conectarnos. Probá de nuevo.'; if (j && j.code === 'duplicado') { modoClub = 'entrar'; pintarPortada(infoClub); $('[data-club-error]').textContent = j.error; } return; }
+    if (j.numeroTxt) try { sessionStorage.setItem('bamba_bienvenida', j.numeroTxt); } catch (e) {}
+    location.replace('/club/' + j.token + '/');
+  } catch (e) { err.textContent = 'No pudimos conectarnos. Probá de nuevo.'; }
+  finally { btn.disabled = false; }
 }
 
 function pintarInvalida() {
@@ -509,7 +559,7 @@ async function cargar() {
     if (s && s.token) { location.replace('/club/' + s.token + '/'); return; }
     let info = null;
     try { const r = await fetch('/api/club/info'); if (r.ok) info = await r.json(); } catch (e) {}
-    pintarPortada(info);
+    infoClub = info; pintarPortada(info);
     return;
   }
   // manifest propio: "agregar a inicio" abre esta credencial
@@ -541,6 +591,7 @@ document.addEventListener('click', async ev => {
   const c = s => ev.target.closest(s);
   if (c('[data-hoja]') && !c('[data-hoja-caja]') || c('[data-cerrar-hoja]')) { $('[data-hoja]').hidden = true; return; }
   if (c('[data-girar]')) { girar(); return; }
+  const mc = c('[data-modo-club]'); if (mc) { modoClub = mc.dataset.modoClub; pintarPortada(infoClub); return; }
   if (c('[data-imagen]')) { const d = datos || (leer(LS_DATOS) || {}).d; if (d) descargarImagen(d.socio); return; }
   if (c('[data-instalar]')) {
     if (instalar) { instalar.prompt(); instalar = null; return; }
@@ -558,6 +609,7 @@ document.addEventListener('click', async ev => {
     location.replace('/club/');
   }
 });
+document.addEventListener('submit', ev => { if (ev.target.matches('.form-club')) { ev.preventDefault(); enviarClub(ev.target); } });
 document.addEventListener('keydown', ev => {
   if ((ev.key === 'Enter' || ev.key === ' ') && ev.target.matches && ev.target.matches('.tarjeta[data-girar]')) { ev.preventDefault(); girar(); }
 });

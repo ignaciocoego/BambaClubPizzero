@@ -174,6 +174,8 @@ export const metodosClub = {
 
   /* ════════════════ PÚBLICO ════════════════ */
   async rClub(ruta, request, url) {
+    if (ruta === "/api/club/alta" && request.method === "POST") return this.rAlta(await this.cuerpo(request), url);
+    if (ruta === "/api/club/entrar" && request.method === "POST") return this.rEntrar(await this.cuerpo(request));
     if (request.method !== "GET") throw new ErrorHttp(405, "Método no permitido", "metodo");
     const c = this.configClub();
     if (ruta === "/api/club/info") return this.resp({ ok: true, ...c });
@@ -200,6 +202,35 @@ export const metodosClub = {
       });
     }
     throw new ErrorHttp(404, "No existe", "no_existe");
+  },
+
+  /* Alta desde la web: el cliente se hace socio solo y entra directo a su credencial. */
+  rAlta(b, url) {
+    let n;
+    try {
+      n = this.datosSocio({ nombre: b.nombre, tel: b.tel, cumple: b.cumple });
+    } catch (e) {
+      // no decimos el número del socio que ya tiene ese teléfono: es lo que se pide para entrar
+      if (e.code === "duplicado") throw new ErrorHttp(409, "Ya hay un socio con ese teléfono. Entrá con tu teléfono y tu número de socio.", "duplicado");
+      throw e;
+    }
+    const numero = this.q(`SELECT COALESCE(MAX(numero), 0) + 1 AS n FROM socios`)[0].n;
+    const ahora = Date.now();
+    const s = this.q(
+      `INSERT INTO socios (numero, token, nombre, tel, email, cumple, nota, estado, creado, actualizado)
+       VALUES (?,?,?,?,'',?,'Alta desde la web','activo',?,?) RETURNING *`,
+      numero, this.nuevoToken(), n.nombre, n.tel, n.cumple || "", ahora, ahora
+    )[0];
+    this.socioCambio(s.id);
+    this.difundir({ t: "admin", evento: "socio_nuevo", socio: { id: s.id, numeroTxt: numeroTxt(s.numero), nombre: s.nombre } }, true);
+    return this.resp({ ok: true, token: s.token, numeroTxt: numeroTxt(s.numero), link: linkCredencial(url.origin, s.token) }, 201);
+  },
+  /* "Ya soy socio" en otro celular: teléfono + número de socio. */
+  rEntrar(b) {
+    const dig = digitos(b.tel), num = entero(digitos(b.numero), 1, 999999);
+    const s = dig.length >= 8 && num ? this.q(`SELECT * FROM socios WHERE numero=? AND estado='activo'`, num)[0] : null;
+    if (!s || !digitos(s.tel).endsWith(dig.slice(-8))) throw new ErrorHttp(404, "No encontramos un socio con ese teléfono y ese número. Revisalos o pedile tu link al local.", "socio");
+    return this.resp({ ok: true, token: s.token });
   },
 
   /* ════════════════ PANEL ════════════════ */

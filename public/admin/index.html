@@ -415,6 +415,7 @@ function conectar() {
     else if (m.t === 'admin') {
       if (m.evento === 'reserva_nueva') { const r = m.reserva; avisar(`Nueva reserva · ${txtMesa(r)} · ${fCorta(r.fecha)} ${hhmm(r.desde)} · ${r.nombre} (${r.personas})`, 'nuevo'); bip(); }
       else if (m.evento === 'reserva_cancelada') { const r = m.reserva; avisar(`Reserva cancelada · ${txtMesa(r)} · ${fCorta(r.fecha)} ${hhmm(r.desde)} · ${r.nombre}`); }
+      else if (m.evento === 'socio_nuevo') { avisar(`Nuevo socio desde la web · Nº ${m.socio.numeroTxt} · ${m.socio.nombre}`, 'nuevo'); bip(); if (S.tab === 'club') cargarClub(true); }
       else if (m.evento === 'pedido_nuevo') { const p = m.pedido; avisar(`Nuevo pedido · ${plata(p.total)}${p.nombre ? ' · ' + p.nombre : ''}`, 'nuevo'); bip(); if (S.tab !== 'pedidos') { S.nuevos++; pintarNuevos(); } }
       refrescarSuave();
     }
