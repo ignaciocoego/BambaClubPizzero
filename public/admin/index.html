@@ -221,6 +221,21 @@ label.campo .dato{text-transform:none;letter-spacing:0;font-weight:500;color:var
 .mov button{color:var(--gris);font-size:13px;padding:2px 6px}
 .fila-ed{display:grid;grid-template-columns:1fr 92px auto;gap:6px;margin-bottom:6px}
 .fila-ed--uno{grid-template-columns:1fr auto}
+/* carta: pizzas por porción */
+.porc{display:grid;grid-template-columns:1fr auto;gap:8px 12px;align-items:center;padding:12px 2px;border-bottom:1px dashed var(--linea)}
+.porc:last-child{border-bottom:none}
+.porc__nom{font-weight:700;font-size:14.5px;line-height:1.2}
+.porc__nom small{display:block;font-weight:600;font-size:12px;color:var(--gris);margin-top:2px}
+.porc__precio{grid-column:1/-1;display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--gris)}
+.porc__precio .dato{max-width:140px}
+.porc--off .porc__nom{color:var(--gris)}
+.interruptor{position:relative;display:inline-flex;align-items:center;gap:8px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap}
+.interruptor input{position:absolute;opacity:0;width:1px;height:1px}
+.interruptor i{width:46px;height:28px;border-radius:99px;background:var(--linea);position:relative;transition:background .15s;flex:none}
+.interruptor i::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3);transition:transform .15s}
+.interruptor input:checked + i{background:var(--verde)}
+.interruptor input:checked + i::after{transform:translateX(18px)}
+.interruptor input:focus-visible + i{outline:3px solid var(--azul);outline-offset:2px}
 .camara{position:relative;background:#000;border-radius:14px;overflow:hidden;aspect-ratio:4/3}
 .camara video{width:100%;height:100%;object-fit:cover;display:block}
 .camara::after{content:"";position:absolute;inset:18%;border:3px solid rgba(255,255,255,.85);border-radius:16px;box-shadow:0 0 0 999px rgba(0,0,0,.25)}
@@ -266,6 +281,7 @@ label.campo .dato{text-transform:none;letter-spacing:0;font-weight:500;color:var
       <button class="tab" role="tab" data-tab="reservas">Reservas</button>
       <button class="tab" role="tab" data-tab="pedidos">Pedidos <b data-nuevos hidden>0</b></button>
       <button class="tab" role="tab" data-tab="club">Club</button>
+      <button class="tab" role="tab" data-tab="carta">Carta</button>
       <button class="tab" role="tab" data-tab="numeros">Números</button>
       <button class="tab" role="tab" data-tab="salon">Salón</button>
     </div>
@@ -310,6 +326,7 @@ const S = {
   fPed: { desde: sumarDias(ahoraAR().fecha, -6), hasta: ahoraAR().fecha, estado: '', q: '' }, pedidos: [],
   rango: 30, stats: null,
   club: { q: '', socios: [], resumen: null, cfg: null, edit: null, socio: null, stream: null, scanT: null },
+  carta: { cfg: null, edit: null },
   edit: null, editSet: null, sel: null,
   ws: null, vivo: false, reint: 0, pingT: null, nuevos: 0, sonido: true, refT: null, cargando: 0,
 };
@@ -393,6 +410,7 @@ function conectar() {
     if (ev.data === 'pong') return;
     let m; try { m = JSON.parse(ev.data); } catch (e) { return; }
     if (m.t === 'cambio') { refrescarSuave(); }
+    else if (m.t === 'carta') { if (S.tab === 'carta' && !cartaCambiada()) cargarCarta(); }
     else if (m.t === 'salon') { api('/api/admin/salon').then(c => { S.cfg = c; refrescarSuave(); }).catch(() => {}); }
     else if (m.t === 'admin') {
       if (m.evento === 'reserva_nueva') { const r = m.reserva; avisar(`Nueva reserva · ${txtMesa(r)} · ${fCorta(r.fecha)} ${hhmm(r.desde)} · ${r.nombre} (${r.personas})`, 'nuevo'); bip(); }
@@ -413,6 +431,7 @@ function refrescarSuave() {
     else if (S.tab === 'pedidos') cargarPedidos(true);
     else if (S.tab === 'numeros') cargarNumeros(true);
     else if (S.tab === 'club') cargarClub(true);
+    else if (S.tab === 'carta' && !cartaCambiada()) cargarCarta();
     if (S.club.socio && $('[data-socio-modal]')) abrirSocio(S.club.socio, true);
   }, 250);
 }
@@ -424,7 +443,7 @@ function irA(tab) {
   $$('[data-tab]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === tab)));
   if (tab === 'pedidos') { S.nuevos = 0; pintarNuevos(); }
   window.scrollTo(0, 0);
-  ({ hoy: vistaHoy, reservas: vistaReservas, pedidos: vistaPedidos, club: vistaClub, numeros: vistaNumeros, salon: vistaSalon })[tab]();
+  ({ hoy: vistaHoy, reservas: vistaReservas, pedidos: vistaPedidos, club: vistaClub, carta: vistaCarta, numeros: vistaNumeros, salon: vistaSalon })[tab]();
 }
 $('.nav').addEventListener('click', ev => { const b = ev.target.closest('[data-tab]'); if (b) irA(b.dataset.tab); });
 
@@ -873,6 +892,55 @@ async function guardarReglas() {
     S.club.cfg = { ...S.club.cfg, ...r };
     S.club.edit = { pesosPorPunto: r.pesosPorPunto, premios: r.premios.map(p => ({ ...p })), beneficios: r.beneficios.slice() };
     pintarReglas(); avisar('Premios y reglas guardados. Ya se ven en la web.');
+  } catch (er) { avisar(er.message, 'error'); }
+}
+
+/* ══════════════ carta: pizzas por porción ══════════════ */
+function vistaCarta() {
+  $('[data-main]').innerHTML = `
+    <div class="enc">
+      <div><h1>CARTA</h1><p>Qué pizzas al molde se venden por porción</p></div>
+    </div>
+    <div class="grid2">
+      <div class="card">
+        <div class="card__tit"><span>POR PORCIÓN</span><small data-k-cuenta></small></div>
+        <div data-k-lista><p class="carga">Cargando…</p></div>
+        <div class="fila" style="margin-top:16px;justify-content:flex-end"><button class="btn btn--claro btn--chico" type="button" data-k-reset>Descartar</button><button class="btn btn--chico" type="button" data-k-guardar>Guardar porciones</button></div>
+      </div>
+      <div class="card">
+        <div class="card__tit"><span>CÓMO FUNCIONA</span></div>
+        <p class="nota" style="margin-bottom:8px">Prendé las pizzas que se venden por porción y poné el precio de la porción. Al guardar, la carta de la web se actualiza sola: en la ficha de la pizza aparece “Pizza entera / Por porción”.</p>
+        <p class="nota" style="margin-bottom:8px">Si apagás una pizza, ya no se puede pedir por porción. Si alguien la tenía en el pedido sin mandar, la web se la saca y le avisa.</p>
+        <p class="nota">El precio de la pizza entera se cambia en la carta (archivo de la web).</p>
+      </div>
+    </div>`;
+  cargarCarta();
+}
+async function cargarCarta() {
+  try {
+    const d = await api('/api/admin/carta');
+    S.carta.cfg = d; S.carta.edit = d.porciones.map(p => ({ ...p }));
+    if (S.tab === 'carta') pintarCarta();
+  } catch (e) { avisar(e.message, 'error'); }
+}
+const cartaCambiada = () => !!(S.carta.edit && S.carta.cfg && JSON.stringify(S.carta.edit) !== JSON.stringify(S.carta.cfg.porciones));
+function pintarCarta() {
+  const e = S.carta.edit, on = e.filter(p => p.porcion).length;
+  $('[data-k-cuenta]').textContent = on + ' de ' + e.length + ' por porción';
+  $('[data-k-lista]').innerHTML = e.map((p, i) => `
+    <div class="porc${p.porcion ? '' : ' porc--off'}">
+      <p class="porc__nom">${esc(p.nombre)}<small>Entera ${plata(p.entera)}</small></p>
+      <label class="interruptor"><span>${p.porcion ? 'Sí' : 'No'}</span><input type="checkbox" data-k="${i}|porcion"${p.porcion ? ' checked' : ''} aria-label="${esc(p.nombre)} se vende por porción"><i></i></label>
+      ${p.porcion ? `<label class="porc__precio">Precio de la porción $<input class="dato" type="number" min="1" step="100" inputmode="numeric" data-k="${i}|precio" value="${p.precio || ''}" placeholder="Ej: 4500"></label>` : ''}
+    </div>`).join('');
+}
+async function guardarCarta() {
+  const falta = S.carta.edit.find(p => p.porcion && !(+p.precio > 0));
+  if (falta) { avisar('Poné el precio de la porción de ' + falta.nombre, 'error'); return; }
+  try {
+    const r = await post('/api/admin/carta', { porciones: S.carta.edit.map(p => ({ id: p.id, porcion: p.porcion, precio: +p.precio || 0 })) }, 'PUT');
+    S.carta.cfg = r; S.carta.edit = r.porciones.map(p => ({ ...p }));
+    pintarCarta(); avisar('Porciones guardadas. Ya se ven en la web.');
   } catch (er) { avisar(er.message, 'error'); }
 }
 
@@ -1328,6 +1396,10 @@ document.addEventListener('click', async ev => {
   if ((el = c('[data-s-quitar]'))) { S.edit.splice(+el.dataset.sQuitar, 1); pintarEditor(); return; }
   if (c('[data-s-guardar]')) { guardarSalon(); return; }
   if (c('[data-s-reset]')) { vistaSalon(); avisar('Cambios descartados'); return; }
+
+  /* carta */
+  if (c('[data-k-guardar]')) { guardarCarta(); return; }
+  if (c('[data-k-reset]')) { if (S.carta.cfg) { S.carta.edit = S.carta.cfg.porciones.map(p => ({ ...p })); pintarCarta(); avisar('Cambios descartados'); } return; }
 });
 document.addEventListener('keydown', ev => {
   if ((ev.key === 'Enter' || ev.key === ' ') && ev.target.matches && ev.target.matches('[data-reserva], .mesa:not(.mesa--editar)')) { ev.preventDefault(); ev.target.click(); }
@@ -1351,6 +1423,13 @@ document.addEventListener('input', ev => {
     $('[data-s-plano]').innerHTML = planoBase(S.edit.map(x => mesaSVG(x, { estado: 'editar', sub: x.personas + ' PERS.' })).join(''));
   }
   if (t.matches('[data-ss]')) S.editSet[t.dataset.ss] = +t.value;
+  /* carta */
+  if (t.matches('[data-k]')) {
+    const [i, k] = t.dataset.k.split('|'), p = S.carta.edit[+i]; if (!p) return;
+    if (k === 'porcion') { p.porcion = t.checked; if (p.porcion && !p.precio) p.precio = ''; pintarCarta(); const x = $(`[data-k="${i}|precio"]`); if (x && p.porcion) x.focus(); }
+    else p.precio = t.value === '' ? '' : Math.max(0, Math.round(+t.value || 0));
+    return;
+  }
   /* club */
   if (t.matches('[data-c-q]')) ap(S.club, 'q', t.value, () => cargarClub(true), 300);
   if (t.matches('[data-cr]')) { S.club.edit.pesosPorPunto = t.value; const e = $('[data-cr-ej]'); if (e) e.textContent = ejemploPuntos(); }

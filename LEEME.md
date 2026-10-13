@@ -36,9 +36,24 @@ worker/
   index.js           enrutador, login del panel, topes de uso y /club/<link>/
   salon.js           Durable Object: reservas, pedidos, salón (SQLite)
   club.js            Club Bamba: socios, puntos, premios (se suma a Salon)
+  carta.js           pizzas al molde por porción (se suma a Salon)
   google-wallet.js   tarjeta de Google Wallet (opcional)
 wrangler.jsonc       configuración (bindings ASSETS y SALON)
 ```
+
+## Carta: empanadas y porciones
+
+- **Empanadas**: no se les puede sacar ni agregar nada. En `MENU` la sección lleva
+  `personalizable:false`, que le gana a `sacable` y a `ing`. Sirve igual para un plato suelto.
+- **Pizzas por porción**: las decide el dueño en el panel → **Carta** (interruptor y precio
+  de la porción por cada pizza al molde). Se guarda en el Durable Object (`config`, clave
+  `carta`) y la web lo lee de `/api/carta` al cargar (y al instante si está abierta). Si el
+  sistema no responde, usa lo último que vio o las variantes "Por porción" de `MENU`.
+- La lista de pizzas está en `worker/carta.js` (`PIZZAS_MOLDE`, con los mismos `id` que en
+  `MENU`). Si se suma una pizza al molde a la carta, hay que sumarla ahí también.
+- Si una porción se apaga o cambia de precio, la web la saca (o corrige) del pedido sin
+  mandar y avisa. El servidor no registra pedidos con porciones que no se venden o con
+  otro precio.
 
 ## Horarios y turnos
 
@@ -59,6 +74,18 @@ Qué hay y cómo funciona:
 - **Credencial web**: tarjeta con QR (solo lleva el número de socio, `BAMBA:0042`), puntos,
   próximo premio, premios, beneficios y movimientos. Se guarda en la pantalla de inicio
   (Android e iPhone) y anda sin señal con los últimos datos.
+- **Cada credencial es única** (`identidad()` en `public/club/index.html`): del número de
+  socio salen siempre el mismo color de fondo (rojo, azul, verde u hondo), el dibujo
+  (mantel, toldo, lunares, baldosas o rayas), el **ingrediente de la suerte** con su frase
+  y el giro del sello "SOCIO DEL CLUB ★ Nº". Al abrirla, el sello golpea; al inclinar el
+  celular (Android) o pasar el dedo, la tarjeta se mueve y le pega la luz. Se respeta
+  "reducir movimiento".
+- **Rango pizzero** según los puntos ganados en total (canjear no baja de rango):
+  Aprendiz de muzza (0), Habitué de la barra (40), Maestro del molde (120), Capo del horno
+  (250) y Leyenda Bamba (500). Se cambian en `RANGOS`.
+- **Dorso** (botón "Dar vuelta la credencial" o tocando la tarjeta): ingrediente de la
+  suerte, puntos ganados, compras, días en el club, puntos para canjear y la escalera de
+  rangos. "Guardar imagen" baja la credencial con su diseño y el QR grande.
 - **Compras**: los pedidos web hechos en un celular donde se abrió la credencial salen
   "como socio" (o "como invitado", si el cliente lo elige) y **suman cuando el local los
   marca Entregado**. Las compras en el local se cargan en la ficha del socio (escaneando el

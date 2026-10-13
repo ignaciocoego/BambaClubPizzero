@@ -96,7 +96,7 @@ export default {
         return json({ ok: false, error: "Demasiados intentos seguidos. Esperá unos minutos o escribinos por WhatsApp.", code: "tope" }, 429);
       }
     }
-    if (["/api/salon", "/api/disponibilidad", "/api/reservas", "/api/reservas/cancelar", "/api/pedidos"].includes(ruta)) {
+    if (["/api/salon", "/api/disponibilidad", "/api/reservas", "/api/reservas/cancelar", "/api/pedidos", "/api/carta"].includes(ruta)) {
       return salon.fetch(request);
     }
     // Club Bamba: datos del programa y de la credencial del socio

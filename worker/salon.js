@@ -1,5 +1,6 @@
 import { DurableObject } from "cloudflare:workers";
 import { metodosClub } from "./club.js";
+import { metodosCarta } from "./carta.js";
 const TZ_MIN = -180;
 const HOLD_MS = 3 * 60 * 1000;
 const ACTIVAS = "('confirmada','sentada')";
@@ -382,6 +383,7 @@ export class Salon extends DurableObject {
       if (ruta === "/api/reservas/cancelar" && m === "POST") return this.rCancelarCliente(await this.cuerpo(request));
       if (ruta === "/api/pedidos" && m === "POST") return this.rPedido(await this.cuerpo(request));
       if (ruta.startsWith("/api/club/")) return await this.rClub(ruta, request, url);
+      if (ruta === "/api/carta" && m === "GET") return this.rCarta();
       if (ruta.startsWith("/api/admin/")) {
         const sub = ruta.slice("/api/admin/".length);
         if (sub === "reservas" && m === "GET") return this.aReservas(url);
@@ -400,6 +402,8 @@ export class Salon extends DurableObject {
         if (sub === "salon" && m === "GET") return this.resp({ ok: true, ...this.config(), maxPersonas: this.maxPersonas() });
         if (sub === "salon" && m === "PUT") return this.aGuardarSalon(await this.cuerpo(request));
         if (sub === "export" && m === "GET") return this.aExportar(url);
+        if (sub === "carta" && m === "GET") return this.resp({ ok: true, ...this.configCarta() });
+        if (sub === "carta" && m === "PUT") return this.aGuardarCarta(await this.cuerpo(request));
         if (sub === "club" || sub.startsWith("socios") || sub.startsWith("movimientos/")) return await this.aClub(sub, request, url);
       }
       throw new ErrorHttp(404, "No existe", "no_existe");
@@ -567,6 +571,7 @@ export class Salon extends DurableObject {
     }
     if (!Array.isArray(b.items) || !b.items.length) throw new ErrorHttp(400, "Pedido vacío", "vacio");
     const items = b.items.slice(0, 60).map((i) => ({
+      id: limpiar(i && i.id, 40),
       name: limpiar(i && i.name, 80),
       variant: limpiar(i && i.variant, 80),
       nota: limpiar(i && i.nota, 120),
@@ -576,6 +581,7 @@ export class Salon extends DurableObject {
       unit: entero(i && i.unit, 0, 1000000) || 0
     })).filter((i) => i.name);
     if (!items.length) throw new ErrorHttp(400, "Pedido vacío", "vacio");
+    this.validarPorciones(items);
     const unidades = items.reduce((s, i) => s + i.qty, 0);
     const total = items.reduce((s, i) => s + i.qty * i.unit, 0);
     const t = ahoraAR();
@@ -892,4 +898,4 @@ export class Salon extends DurableObject {
 }
 
 // Club Bamba: socios, puntos y premios (worker/club.js)
-Object.assign(Salon.prototype, metodosClub);
+Object.assign(Salon.prototype, metodosClub, metodosCarta);
