@@ -183,9 +183,17 @@ export const metodosClub = {
       const v = this.vistaSocio(s);
       const movimientos = this.q(`SELECT * FROM movimientos WHERE socio_id=? ORDER BY creado DESC, id DESC LIMIT 30`, s.id).map((m) => this.vistaMovimiento(m));
       const google = await linkGoogleWallet(this.env, { socio: v, origen: url.origin, credencial: linkCredencial(url.origin, s.token) });
+      // para el rango y el dorso de la credencial: puntos ganados en total (los canjes no bajan de rango) y compras
+      const hist = this.q(
+        `SELECT COALESCE(SUM(CASE WHEN puntos > 0 THEN puntos ELSE 0 END), 0) AS ganados, SUM(tipo='compra') AS compras FROM movimientos WHERE socio_id=?`,
+        s.id
+      )[0];
       return this.resp({
         ok: true,
-        socio: { numero: v.numero, numeroTxt: v.numeroTxt, qr: v.qr, nombre: v.nombre, tel: v.tel, desde: v.creado, puntos: v.puntos },
+        socio: {
+          numero: v.numero, numeroTxt: v.numeroTxt, qr: v.qr, nombre: v.nombre, tel: v.tel, desde: v.creado, puntos: v.puntos,
+          ganados: hist.ganados || 0, compras: hist.compras || 0
+        },
         movimientos,
         ...c,
         wallet: { google }

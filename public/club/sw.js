@@ -1,6 +1,6 @@
 /* Credencial del Club Bamba: guarda la página y sus archivos para poder mostrar
    el QR en el local aunque no haya señal (los datos del socio quedan en el celular). */
-const CACHE = 'club-bamba-v1';
+const CACHE = 'club-bamba-v2';
 const ARCHIVOS = ['/club/', '/club/marca.css', '/club/qrcode.js', '/favicon.svg'];
 
 self.addEventListener('install', ev => {
