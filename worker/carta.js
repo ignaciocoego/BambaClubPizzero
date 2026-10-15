@@ -9,7 +9,7 @@
      el panel (pestaña Carta). La carta lo lee de /api/carta al cargar.
    - Los pedidos con "Por porción" se validan contra esto.
    ══════════════════════════════════════════════════════════ */
-import { ErrorHttp, entero } from "./salon.js";
+import { ErrorHttp, entero, limpiar } from "./salon.js";
 
 export const VARIANTE_PORCION = "Por porción";
 
@@ -29,7 +29,75 @@ export const PIZZAS_MOLDE = [
   { id: "fugazzetajamon", nombre: "Fugazzeta rellena con jamón", entera: 41000, porcion: true, precio: 6000 }
 ];
 
+const COLORES = ["rojo", "azul"];
+const idLimpio = (s) => limpiar(s, 40).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9-]+/g, "-").replace(/^-|-$/g, "");
+const textos = (a, max, largo) => (Array.isArray(a) ? a.slice(0, max).map((x) => limpiar(x, largo)).filter(Boolean) : undefined);
+
+/* La carta completa que arma el dueño en el panel. Se guarda entera (con los platos ocultos) y la web la usa en lugar de /menu.js. */
+function limpiarMenu(menu) {
+  if (!Array.isArray(menu) || !menu.length || menu.length > 30) throw new ErrorHttp(400, "La carta no es válida", "menu");
+  const ids = new Set();
+  return menu.map((sec) => {
+    const id = idLimpio(sec && sec.id);
+    const title = limpiar(sec && sec.title, 60);
+    if (!id || !title) throw new ErrorHttp(400, "Cada sección necesita un nombre", "menu");
+    const out = { id, title, color: COLORES.includes(sec.color) ? sec.color : "rojo" };
+    if (sec.badge) out.badge = limpiar(sec.badge, 30);
+    for (const k of ["sacable", "porcionable"]) if (sec[k]) out[k] = true;
+    if (sec.personalizable === false) out.personalizable = false;
+    if (sec.especial === "mitad") out.especial = "mitad";
+    const items = Array.isArray(sec.items) ? sec.items.slice(0, 80) : [];
+    out.items = items.map((it) => {
+      const name = limpiar(it && it.name, 80);
+      if (!name) throw new ErrorHttp(400, `Hay un plato sin nombre en ${title}`, "menu");
+      const price = entero(it.price, 0, 10000000);
+      if (price == null) throw new ErrorHttp(400, `Revisá el precio de ${name}`, "menu");
+      let pid = idLimpio(it.id) || idLimpio(name);
+      while (ids.has(pid)) pid += "-2";
+      ids.add(pid);
+      const o = { id: pid, name, price };
+      const desc = limpiar(it.desc, 200);
+      if (desc) o.desc = desc;
+      if (it.oculto) o.oculto = true;
+      for (const k of ["mitad", "ingVariante"]) if (it[k]) o[k] = true;
+      if (it.personalizable === false) o.personalizable = false;
+      const ing = textos(it.ing, 15, 40);
+      if (ing && ing.length) o.ing = ing;
+      if (Array.isArray(it.variants) && it.variants.length) {
+        o.variantLabel = limpiar(it.variantLabel, 30) || "Elegí";
+        o.variants = it.variants.slice(0, 10).map((v) => ({ name: limpiar(v && v.name, 80) || "Opción", price: entero(v && v.price, 0, 10000000) ?? price }));
+      }
+      return o;
+    });
+    return out;
+  });
+}
+
 export const metodosCarta = {
+  menuGuardado() {
+    if (this.menu !== undefined) return this.menu;
+    const fila = this.q(`SELECT v FROM config WHERE k='menu'`)[0];
+    try {
+      this.menu = fila ? JSON.parse(fila.v) : null;
+    } catch (e) {
+      this.menu = null;
+    }
+    return this.menu;
+  },
+  aGuardarMenu(b) {
+    const menu = limpiarMenu(b.menu);
+    this.sql.exec(`INSERT INTO config (k, v) VALUES ('menu', ?) ON CONFLICT(k) DO UPDATE SET v=excluded.v`, JSON.stringify(menu));
+    this.menu = undefined;
+    this.difundir({ t: "carta" });
+    return this.resp({ ok: true, menu: this.menuGuardado() });
+  },
+  aBorrarMenu() {
+    this.sql.exec(`DELETE FROM config WHERE k='menu'`);
+    this.menu = undefined;
+    this.difundir({ t: "carta" });
+    return this.resp({ ok: true, menu: null });
+  },
+
   configCarta() {
     if (this.carta) return this.carta;
     let g = {};
@@ -63,7 +131,7 @@ export const metodosCarta = {
 
   /* ════════════════ PÚBLICO ════════════════ */
   rCarta() {
-    return this.resp({ ok: true, porciones: this.configCarta().porciones.map((p) => ({ id: p.id, porcion: p.porcion, precio: p.precio })) });
+    return this.resp({ ok: true, menu: this.menuGuardado(), porciones: this.configCarta().porciones.map((p) => ({ id: p.id, porcion: p.porcion, precio: p.precio })) });
   },
 
   /* ════════════════ PANEL ════════════════ */

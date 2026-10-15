@@ -29,6 +29,7 @@ La versión vieja del repo (sitio estático sin backend) quedó en el historial 
 ```
 public/              archivos estáticos (Workers Static Assets)
   index.html         sitio (HTML + CSS + JS + fuentes embebidas en base64)
+  menu.js            carta original (platos y precios), la usan el sitio y el panel
   admin/index.html   panel de dueños
   club/              credencial del socio (index.html), su service worker,
                      marca.css (fuentes y logo) y qrcode.js (qrcode-generator, MIT)
@@ -42,6 +43,14 @@ wrangler.jsonc       configuración (bindings ASSETS y SALON)
 ```
 
 ## Carta: empanadas y porciones
+
+- **La carta se maneja desde el panel → Carta**: por cada sección, nombre, precio y descripción
+  de cada plato, si se ve en la web (interruptor), borrar y agregar platos. "Guardar carta" la
+  guarda en el Durable Object (`config`, clave `menu`) y la web la usa al instante en lugar de
+  `public/menu.js`. "Volver a la carta original" borra lo guardado y vuelve a `public/menu.js`.
+- `public/menu.js` es la carta original (la comparten la web y el panel). Las opciones de cada
+  plato (cocción, relleno, etc.) se cambian ahí; si un plato cambia de precio en el panel, las
+  opciones que costaban lo mismo siguen al precio nuevo.
 
 - **Empanadas**: no se les puede sacar ni agregar nada. En `MENU` la sección lleva
   `personalizable:false`, que le gana a `sacable` y a `ing`. Sirve igual para un plato suelto.

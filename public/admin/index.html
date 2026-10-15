@@ -229,6 +229,15 @@ label.campo .dato{text-transform:none;letter-spacing:0;font-weight:500;color:var
 .porc__precio{grid-column:1/-1;display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--gris)}
 .porc__precio .dato{max-width:140px}
 .porc--off .porc__nom{color:var(--gris)}
+.plato-ed{display:grid;grid-template-columns:auto 1fr 110px auto;gap:6px 8px;align-items:center;padding:10px 0;border-bottom:1px dashed var(--linea)}
+.plato-ed:last-of-type{border-bottom:none}
+.plato-ed .dato{min-width:0}
+.plato-ed__desc{grid-column:2/-1}
+.plato-ed__var{grid-column:2/-1;font-size:11.5px;color:var(--gris)}
+.plato-ed--oculto .dato{opacity:.5}
+.secs{display:grid;grid-template-columns:1fr;gap:14px;margin-top:14px}
+@media(min-width:860px){.secs{grid-template-columns:1fr 1fr}}
+.barra-guardar{position:sticky;bottom:0;z-index:5;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;background:var(--crema);padding:12px 0;border-top:1.5px solid var(--linea);margin-top:14px}
 .interruptor{position:relative;display:inline-flex;align-items:center;gap:8px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap}
 .interruptor input{position:absolute;opacity:0;width:1px;height:1px}
 .interruptor i{width:46px;height:28px;border-radius:99px;background:var(--linea);position:relative;transition:background .15s;flex:none}
@@ -293,6 +302,7 @@ label.campo .dato{text-transform:none;letter-spacing:0;font-weight:500;color:var
 <div class="toasts" data-toasts aria-live="polite"></div>
 
 <script src="/club/qrcode.js"></script>
+<script src="/menu.js"></script>
 <script>
 (() => {
 'use strict';
@@ -326,7 +336,7 @@ const S = {
   fPed: { desde: sumarDias(ahoraAR().fecha, -6), hasta: ahoraAR().fecha, estado: '', q: '' }, pedidos: [],
   rango: 30, stats: null,
   club: { q: '', socios: [], resumen: null, cfg: null, edit: null, socio: null, stream: null, scanT: null },
-  carta: { cfg: null, edit: null },
+  carta: { cfg: null, edit: null, menu: null, menuOrig: null },
   edit: null, editSet: null, sel: null,
   ws: null, vivo: false, reint: 0, pingT: null, nuevos: 0, sonido: true, refT: null, cargando: 0,
 };
@@ -410,7 +420,7 @@ function conectar() {
     if (ev.data === 'pong') return;
     let m; try { m = JSON.parse(ev.data); } catch (e) { return; }
     if (m.t === 'cambio') { refrescarSuave(); }
-    else if (m.t === 'carta') { if (S.tab === 'carta' && !cartaCambiada()) cargarCarta(); }
+    else if (m.t === 'carta') { if (S.tab === 'carta' && !cartaCambiada() && !menuCambiado()) cargarCarta(); }
     else if (m.t === 'salon') { api('/api/admin/salon').then(c => { S.cfg = c; refrescarSuave(); }).catch(() => {}); }
     else if (m.t === 'admin') {
       if (m.evento === 'reserva_nueva') { const r = m.reserva; avisar(`Nueva reserva · ${txtMesa(r)} · ${fCorta(r.fecha)} ${hhmm(r.desde)} · ${r.nombre} (${r.personas})`, 'nuevo'); bip(); }
@@ -432,7 +442,7 @@ function refrescarSuave() {
     else if (S.tab === 'pedidos') cargarPedidos(true);
     else if (S.tab === 'numeros') cargarNumeros(true);
     else if (S.tab === 'club') cargarClub(true);
-    else if (S.tab === 'carta' && !cartaCambiada()) cargarCarta();
+    else if (S.tab === 'carta' && !cartaCambiada() && !menuCambiado()) cargarCarta();
     if (S.club.socio && $('[data-socio-modal]')) abrirSocio(S.club.socio, true);
   }, 250);
 }
@@ -900,9 +910,15 @@ async function guardarReglas() {
 function vistaCarta() {
   $('[data-main]').innerHTML = `
     <div class="enc">
-      <div><h1>CARTA</h1><p>Qué pizzas al molde se venden por porción</p></div>
+      <div><h1>CARTA</h1><p>Platos, precios y qué se ve en la web · pizzas por porción</p></div>
     </div>
-    <div class="grid2">
+    <div class="secs" data-m-secs><p class="carga">Cargando…</p></div>
+    <div class="barra-guardar">
+      <button class="btn btn--claro btn--chico" type="button" data-m-original>Volver a la carta original</button>
+      <button class="btn btn--claro btn--chico" type="button" data-m-reset>Descartar</button>
+      <button class="btn btn--chico" type="button" data-m-guardar>Guardar carta</button>
+    </div>
+    <div class="grid2" style="margin-top:14px">
       <div class="card">
         <div class="card__tit"><span>POR PORCIÓN</span><small data-k-cuenta></small></div>
         <div data-k-lista><p class="carga">Cargando…</p></div>
@@ -912,7 +928,7 @@ function vistaCarta() {
         <div class="card__tit"><span>CÓMO FUNCIONA</span></div>
         <p class="nota" style="margin-bottom:8px">Prendé las pizzas que se venden por porción y poné el precio de la porción. Al guardar, la carta de la web se actualiza sola: en la ficha de la pizza aparece “Pizza entera / Por porción”.</p>
         <p class="nota" style="margin-bottom:8px">Si apagás una pizza, ya no se puede pedir por porción. Si alguien la tenía en el pedido sin mandar, la web se la saca y le avisa.</p>
-        <p class="nota">El precio de la pizza entera se cambia en la carta (archivo de la web).</p>
+        <p class="nota">El precio de la pizza entera se cambia arriba, en BAMBA AL MOLDE.</p>
       </div>
     </div>`;
   cargarCarta();
@@ -921,20 +937,56 @@ async function cargarCarta() {
   try {
     const d = await api('/api/admin/carta');
     S.carta.cfg = d; S.carta.edit = d.porciones.map(p => ({ ...p }));
-    if (S.tab === 'carta') pintarCarta();
+    S.carta.menuOrig = JSON.parse(JSON.stringify(d.menu || window.BAMBA_MENU || []));
+    S.carta.menu = JSON.parse(JSON.stringify(S.carta.menuOrig));
+    if (S.tab === 'carta') { pintarCarta(); pintarMenu(); }
   } catch (e) { avisar(e.message, 'error'); }
 }
 const cartaCambiada = () => !!(S.carta.edit && S.carta.cfg && JSON.stringify(S.carta.edit) !== JSON.stringify(S.carta.cfg.porciones));
+const enteraDe = p => { const it = (S.carta.menu || []).flatMap(s => s.items).find(i => i.id === p.id); return it ? it.price : p.entera; };
 function pintarCarta() {
   const e = S.carta.edit, on = e.filter(p => p.porcion).length;
   $('[data-k-cuenta]').textContent = on + ' de ' + e.length + ' por porción';
   $('[data-k-lista]').innerHTML = e.map((p, i) => `
     <div class="porc${p.porcion ? '' : ' porc--off'}">
-      <p class="porc__nom">${esc(p.nombre)}<small>Entera ${plata(p.entera)}</small></p>
+      <p class="porc__nom">${esc(p.nombre)}<small>Entera ${plata(enteraDe(p))}</small></p>
       <label class="interruptor"><span>${p.porcion ? 'Sí' : 'No'}</span><input type="checkbox" data-k="${i}|porcion"${p.porcion ? ' checked' : ''} aria-label="${esc(p.nombre)} se vende por porción"><i></i></label>
       ${p.porcion ? `<label class="porc__precio">Precio de la porción $<input class="dato" type="number" min="1" step="100" inputmode="numeric" data-k="${i}|precio" value="${p.precio || ''}" placeholder="Ej: 4500"></label>` : ''}
     </div>`).join('');
 }
+/* La carta entera: cada sección con sus platos. Lo que se guarda acá reemplaza a /menu.js en la web. */
+function pintarMenu() {
+  const M = S.carta.menu;
+  $('[data-m-secs]').innerHTML = M.map((sec, si) => sec.especial ? `
+    <div class="card"><div class="card__tit"><span>${esc(sec.title)}</span></div><p class="nota">Se arma sola con las pizzas al molde marcadas para mitad y mitad.</p></div>` : `
+    <div class="card">
+      <div class="card__tit"><span>${esc(sec.title)}</span><small>${sec.items.filter(i => !i.oculto).length} de ${sec.items.length} visibles</small></div>
+      ${sec.items.map((it, ii) => `
+      <div class="plato-ed${it.oculto ? ' plato-ed--oculto' : ''}">
+        <label class="interruptor" title="Se ve en la web"><input type="checkbox" data-m="${si}|${ii}|visible"${it.oculto ? '' : ' checked'} aria-label="${esc(it.name)} se ve en la web"><i></i></label>
+        <input class="dato" data-m="${si}|${ii}|name" value="${esc(it.name)}" placeholder="Nombre del plato" maxlength="80">
+        <input class="dato" type="number" min="0" step="100" inputmode="numeric" data-m="${si}|${ii}|price" value="${it.price}" aria-label="Precio de ${esc(it.name)}">
+        <button class="btn btn--peligro btn--chico" type="button" data-m-quitar="${si}|${ii}" aria-label="Borrar ${esc(it.name)}">✕</button>
+        <input class="dato plato-ed__desc" data-m="${si}|${ii}|desc" value="${esc(it.desc || '')}" placeholder="Descripción (opcional)" maxlength="200">
+        ${it.variants ? `<p class="plato-ed__var">${esc(it.variantLabel || 'Opciones')}: ${it.variants.map(v => esc(v.name)).join(' / ')}</p>` : ''}
+      </div>`).join('') || '<p class="vacio">No hay platos en esta sección.</p>'}
+      <button class="btn btn--claro btn--chico" type="button" data-m-nuevo="${si}" style="margin-top:10px">＋ Agregar plato</button>
+    </div>`).join('');
+}
+const menuCambiado = () => !!S.carta.menu && JSON.stringify(S.carta.menu) !== JSON.stringify(S.carta.menuOrig);
+async function guardarMenu() {
+  if (S.carta.menu.flatMap(s => s.items).some(i => !String(i.name).trim())) { avisar('Hay un plato sin nombre', 'error'); return; }
+  try {
+    const r = await post('/api/admin/menu', { menu: S.carta.menu }, 'PUT');
+    S.carta.menuOrig = r.menu; S.carta.menu = JSON.parse(JSON.stringify(r.menu));
+    pintarMenu(); avisar('Carta guardada. Ya se ve en la web.');
+  } catch (er) { avisar(er.message, 'error'); }
+}
+async function cartaOriginal() {
+  if (!confirm('¿Volver a la carta original? Se pierden los cambios hechos desde el panel.')) return;
+  try { await post('/api/admin/menu', {}, 'DELETE'); avisar('Volvió la carta original'); cargarCarta(); } catch (er) { avisar(er.message, 'error'); }
+}
+
 async function guardarCarta() {
   const falta = S.carta.edit.find(p => p.porcion && !(+p.precio > 0));
   if (falta) { avisar('Poné el precio de la porción de ' + falta.nombre, 'error'); return; }
@@ -1400,6 +1452,11 @@ document.addEventListener('click', async ev => {
 
   /* carta */
   if (c('[data-k-guardar]')) { guardarCarta(); return; }
+  if (c('[data-m-guardar]')) { guardarMenu(); return; }
+  if (c('[data-m-reset]')) { S.carta.menu = JSON.parse(JSON.stringify(S.carta.menuOrig)); pintarMenu(); avisar('Cambios descartados'); return; }
+  if (c('[data-m-original]')) { cartaOriginal(); return; }
+  if ((el = c('[data-m-nuevo]'))) { const si = el.dataset.mNuevo, sec = S.carta.menu[+si]; sec.items.push({ id: '', name: '', price: 0 }); pintarMenu(); const x = $(`[data-m="${si}|${sec.items.length - 1}|name"]`); if (x) x.focus(); return; }
+  if ((el = c('[data-m-quitar]'))) { const [si, ii] = el.dataset.mQuitar.split('|').map(Number), it = S.carta.menu[si].items[ii]; if (it.name && !confirm('¿Borrar ' + it.name + ' de la carta?')) return; S.carta.menu[si].items.splice(ii, 1); pintarMenu(); return; }
   if (c('[data-k-reset]')) { if (S.carta.cfg) { S.carta.edit = S.carta.cfg.porciones.map(p => ({ ...p })); pintarCarta(); avisar('Cambios descartados'); } return; }
 });
 document.addEventListener('keydown', ev => {
@@ -1424,6 +1481,18 @@ document.addEventListener('input', ev => {
     $('[data-s-plano]').innerHTML = planoBase(S.edit.map(x => mesaSVG(x, { estado: 'editar', sub: x.personas + ' PERS.' })).join(''));
   }
   if (t.matches('[data-ss]')) S.editSet[t.dataset.ss] = +t.value;
+  if (t.matches('[data-m]')) {
+    const [si, ii, k] = t.dataset.m.split('|'), it = S.carta.menu[+si] && S.carta.menu[+si].items[+ii]; if (!it) return;
+    if (k === 'visible') { if (t.checked) delete it.oculto; else it.oculto = true; pintarMenu(); }
+    else if (k === 'price') {
+      const n = Math.max(0, Math.round(+t.value || 0));
+      // las opciones que costaban lo mismo que el plato (ej: horneada / frita) siguen al precio nuevo
+      if (it.variants) it.variants.forEach(v => { if (v.price === it.price) v.price = n; });
+      it.price = n;
+    }
+    else it[k] = t.value;
+    return;
+  }
   /* carta */
   if (t.matches('[data-k]')) {
     const [i, k] = t.dataset.k.split('|'), p = S.carta.edit[+i]; if (!p) return;

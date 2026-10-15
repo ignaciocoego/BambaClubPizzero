@@ -402,7 +402,9 @@ export class Salon extends DurableObject {
         if (sub === "salon" && m === "GET") return this.resp({ ok: true, ...this.config(), maxPersonas: this.maxPersonas() });
         if (sub === "salon" && m === "PUT") return this.aGuardarSalon(await this.cuerpo(request));
         if (sub === "export" && m === "GET") return this.aExportar(url);
-        if (sub === "carta" && m === "GET") return this.resp({ ok: true, ...this.configCarta() });
+        if (sub === "carta" && m === "GET") return this.resp({ ok: true, ...this.configCarta(), menu: this.menuGuardado() });
+        if (sub === "menu" && m === "PUT") return this.aGuardarMenu(await this.cuerpo(request, 120000));
+        if (sub === "menu" && m === "DELETE") return this.aBorrarMenu();
         if (sub === "carta" && m === "PUT") return this.aGuardarCarta(await this.cuerpo(request));
         if (sub === "club" || sub.startsWith("socios") || sub.startsWith("movimientos/")) return await this.aClub(sub, request, url);
       }
@@ -419,9 +421,9 @@ export class Salon extends DurableObject {
       headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", "x-content-type-options": "nosniff", ...extra }
     });
   }
-  async cuerpo(request) {
+  async cuerpo(request, max = 40000) {
     const txt = await request.text();
-    if (txt.length > 40000) throw new ErrorHttp(413, "Pedido demasiado grande", "grande");
+    if (txt.length > max) throw new ErrorHttp(413, "Pedido demasiado grande", "grande");
     try {
       const o = JSON.parse(txt || "{}");
       if (o && typeof o === "object") return o;
