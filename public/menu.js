@@ -9,6 +9,8 @@
    porcionable: las pizzas de la sección se pueden vender por porción. Cuáles sí y a qué precio lo
    decide el dueño en el panel (pestaña Carta); las variantes "Por porción" de acá son el valor por
    defecto si el sistema no responde. */
+/* La web es para pedir take away o delivery: no va nada que solo se sirve en el local
+   (café, cervezas tiradas, tragos, copas de vino). */
 window.BAMBA_MENU = [
   { id:'mas-alla', sacable:true, title:'MÁS ALLÁ DE LA PIZZA', color:'azul', items:[
     { id:'faina', name:'Faina', price:2000 },
@@ -59,31 +61,19 @@ window.BAMBA_MENU = [
     { id:'flan', name:'Flan', price:10000, variantLabel:'Elegí', variants:[{name:'Con crema',price:10000},{name:'Con dulce de leche',price:10000},{name:'Mixto',price:10000}] },
     { id:'pizzapistacchio', ing:['Azúcar impalpable','Pistachos'], name:'Pizza con pistacchio', price:15000, desc:'Azúcar impalpable, lluvia de pistachos.' },
     { id:'pizzanutella', ing:['Azúcar impalpable','Nueces'], name:'Pizza con nutella', price:15000, desc:'Azúcar impalpable, nueces.' },
-    { id:'cafeexpresso', name:'Café Expresso', price:3000 },
-    { id:'cafecortado', name:'Café Cortado', price:3200 },
   ]},
-  { id:'tragos', title:'CERVEZA Y TRAGOS', color:'rojo', items:[
-    { id:'quilmes', name:'Quilmes', price:5000, desc:'Tirada.' },
-    { id:'stella', name:'Stella Artois', price:6500, desc:'Tirada.' },
-    { id:'patagonia', name:'Patagonia 24.7', price:6500, desc:'Tirada.' },
+  { id:'cervezas', title:'CERVEZAS', color:'rojo', items:[
     { id:'quilmesstout', name:'Quilmes Stout', price:7500, desc:'1 litro.' },
     { id:'amber', name:'Amber', price:7000, desc:'473 cc.' },
     { id:'corona', name:'Corona', price:6500 },
     { id:'coronacero', name:'Corona Cero', price:6500 },
     { id:'michelob', name:'Michelob', price:6500 },
-    { id:'fernet', name:'Fernet', price:7000 },
-    { id:'vermouth', name:'Vermouth', price:7000 },
-    { id:'aperol', name:'Aperol', price:7000 },
-    { id:'cynar', name:'Cynar', price:7000 },
-    { id:'campari', name:'Campari', price:7000 },
-    { id:'moscato', name:'Moscato', price:7000 },
   ]},
   { id:'vinos', title:'VINOS Y ESPUMANTES', color:'rojo', items:[
     { id:'nicassiamalbec', name:'Nicassia Malbec', price:20000 },
     { id:'nicassiacabernet', name:'Nicassia Cabernet Franc', price:20000 },
     { id:'catenazapata', name:'Catena Zapata Malbec', price:30000 },
     { id:'nicassiablanc', name:'Nicassia Blanc', price:20000 },
-    { id:'copadevino', name:'Copa de vino', price:7000 },
     { id:'baronb', name:'Baron B', price:60000 },
   ]},
   { id:'bebidas', title:'BEBIDAS SIN ALCOHOL', color:'azul', items:[
