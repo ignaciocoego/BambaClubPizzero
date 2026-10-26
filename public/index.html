@@ -1566,7 +1566,8 @@ function horas() {
   return RES.disp.turnos.filter(t => t >= lim);
 }
 /* Mesas juntas: solo las marcadas como `unible` en el salón, de a juntarMax, y tienen que estar pegadas en el plano.
-   Cualquier mesa donde entre el grupo se puede elegir; las de 2 se suman solas cuando el grupo es más grande. */
+   Cualquier mesa donde entre el grupo se puede elegir; las de 2 se suman solas cuando el grupo es más grande.
+   Para 7 u 8 personas están además los grupos grandes (settings.gruposGrandes: 7-8-9 y 12-13-14). */
 const selIds = () => RES.mesa ? RES.mesa.split(',') : [];
 const unible = m => !!m.unible;
 function hueco(a, b) {
@@ -1580,6 +1581,9 @@ const libreParaGrupo = (m, t, conHolds) => !ocupadaEn(m.id, t) && !(conHolds && 
 function armarGrupo(m, t, conHolds) {
   if (t == null || !libreParaGrupo(m, t, conHolds)) return null;
   if (m.personas >= RES.pax) return [m];
+  return juntarCerca(m, t, conHolds) || grupoGrande(m, t, conHolds);
+}
+function juntarCerca(m, t, conHolds) {
   if (!unible(m)) return null;
   const g = [m];
   while (capGrupo(g) < RES.pax) {
@@ -1594,6 +1598,14 @@ function armarGrupo(m, t, conHolds) {
     g.push(mejor);
   }
   return g;
+}
+/* Los grupos grandes del salón (con las mesas que existen) que incluyen a `m`. */
+const gruposGrandes = () => (RES.cfg.settings.gruposGrandes || []).map(ids => ids.map(id => RES.cfg.mesas.find(x => x.id === id)))
+  .filter(g => g.length > 1 && g.every(Boolean));
+function grupoGrande(m, t, conHolds) {
+  return gruposGrandes().find(g => g.includes(m) && capGrupo(g) >= RES.pax
+    && g.every((_, i) => capGrupo(g.filter((__, j) => j !== i)) < RES.pax)
+    && g.every(x => libreParaGrupo(x, t, conHolds))) || null;
 }
 const capGrupo = g => g.reduce((t, m) => t + m.personas, 0) + (g.length > 1 ? RES.cfg.settings.juntarCabezales : 0);
 const idsGrupo = g => g.map(m => m.id).sort((a, b) => a.localeCompare(b, 'es', { numeric:true })).join(',');
@@ -1739,9 +1751,13 @@ function estadoMesa(m) {
 function enlacesPlano() {
   const sel = selIds(), ms = RES.cfg.mesas.filter(unible), fijas = [], guias = [];
   if (RES.desde == null || !ms.length || RES.pax <= Math.max(...ms.map(m => m.personas))) return '';
-  for (let i = 0; i < ms.length; i++) for (let j = i + 1; j < ms.length; j++) {
-    const a = ms[i], b = ms[j];
-    if (!pegadas(a, b)) continue;
+  // pares que se pueden unir: los pegados entre sí y, si el grupo no entra juntando de a dos, los de los grupos grandes
+  const deA2 = ms.slice().sort((a, b) => b.personas - a.personas).slice(0, RES.cfg.settings.juntarMax);
+  const pares = RES.pax > capGrupo(deA2) ? [] : ms.flatMap((a, i) => ms.slice(i + 1).filter(b => pegadas(a, b)).map(b => [a, b]));
+  for (const g of gruposGrandes()) if (g.length === sel.length && g.every(m => sel.includes(m.id)) || RES.pax > capGrupo(deA2)) {
+    for (let i = 1; i < g.length; i++) if (!pares.some(([a, b]) => (a === g[i - 1] && b === g[i]) || (a === g[i] && b === g[i - 1]))) pares.push([g[i - 1], g[i]]);
+  }
+  for (const [a, b] of pares) {
     const l = `x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}"`;
     if (sel.includes(a.id) && sel.includes(b.id)) fijas.push(`<line ${l} stroke="#FFD24A" stroke-width="8" stroke-linecap="round"/><line ${l} stroke="#FFFBF3" stroke-width="6.4" stroke-linecap="round"/>`);
     else if (!sel.length && estadoMesa(a) === 'libre' && estadoMesa(b) === 'libre') guias.push(`<line ${l} stroke="#8ED3AE" stroke-opacity=".75" stroke-width=".9" stroke-dasharray="1.4 1.3" stroke-linecap="round"/>`);
@@ -1798,7 +1814,7 @@ function pintarForm() {
       ${avisoTurno(RES.desde)}
       <input class="campo" name="nombre" placeholder="Tu nombre" autocomplete="name" maxlength="60" value="${esc(g.nombre)}">
       <input class="campo" name="tel" type="tel" inputmode="tel" placeholder="Teléfono (para confirmarte)" autocomplete="tel" maxlength="20" value="${esc(g.tel)}">
-      <textarea class="campo" name="nota" rows="2" maxlength="200" placeholder="¿Cumpleaños, alergias, cochecito? (opcional)" style="resize:vertical"></textarea>
+      <textarea class="campo" name="nota" rows="2" maxlength="200" placeholder="Referencia: ¿cumpleaños, alergias, cochecito? (opcional)" style="resize:vertical"></textarea>
       <p class="raviso">Trataremos de mantener la mesa solicitada, pero está sujeto a modificaciones según demanda, respetando lugar de salón y cantidad de comensales.</p>
       <p class="error rerror" data-rerror role="alert"></p>
       <button class="rbtn" type="submit" data-rbtn>Confirmar reserva</button>
@@ -1810,13 +1826,13 @@ function pintarTicket() {
   if (!t) { cont.innerHTML = ''; return; }
   const tm = String(t.mesa).split(','), zona = zonaMesas(t.mesa);
   const corta = turnosFijos().some(x => x > t.desde);
-  const msg = `Hola! Reservé la ${txtMesas(t.mesa)} para el ${fechaCorta(t.fecha)} a las ${hhmm(t.desde)}${corta ? ' (turno hasta las ' + hhmm(t.hasta) + ')' : ''} (${t.personas} ${t.personas === 1 ? 'persona' : 'personas'}) a nombre de ${t.nombre}. Código: ${t.codigo}`;
+  const msg = `Hola! Reservé ${tm.length > 1 ? 'las' : 'la'} ${txtMesas(t.mesa)} para el ${fechaCorta(t.fecha)} a las ${hhmm(t.desde)}${corta ? ' (turno hasta las ' + hhmm(t.hasta) + ')' : ''} (${t.personas} ${t.personas === 1 ? 'persona' : 'personas'}) a nombre de ${t.nombre}. Código: ${t.codigo}${t.nota ? '. Referencia: ' + t.nota : ''}`;
   cont.innerHTML = `
     <div class="ticket">
       <div class="ticket__main">
         <p class="eyebrow">Tu reserva</p>
         <p class="ticket__mesa${tm.length > 1 ? ' ticket__mesa--junta' : ''}">${tm.length > 1 ? 'MESAS ' : 'MESA '}${esc(tm.join(' + '))}</p>
-        <p class="ticket__det"><b>${fechaCorta(t.fecha)} · ${hhmm(t.desde)}</b> a ${hhmm(t.hasta)}<br>${t.personas} ${t.personas === 1 ? 'persona' : 'personas'} · ${esc(t.nombre)}${zona ? '<br>' + esc(zona) : ''}</p>
+        <p class="ticket__det"><b>${fechaCorta(t.fecha)} · ${hhmm(t.desde)}</b> a ${hhmm(t.hasta)}<br>${t.personas} ${t.personas === 1 ? 'persona' : 'personas'} · ${esc(t.nombre)}${zona ? '<br>' + esc(zona) : ''}${t.nota ? '<br>Referencia: “' + esc(t.nota) + '”' : ''}</p>
         ${corta ? `<p class="raviso raviso--importante" role="note"><b>Importante</b>Tu turno termina a las ${hhmm(t.hasta)}. A esa hora necesitamos la mesa para el turno siguiente.</p>` : ''}
         <p class="raviso raviso--ticket">Trataremos de mantener la mesa solicitada, pero está sujeto a modificaciones según demanda, respetando lugar de salón y cantidad de comensales.</p>
       </div>
@@ -2023,7 +2039,7 @@ async function enviarReserva(f) {
   try {
     const r = await postJSON('/api/reservas', { mesa:RES.mesa, fecha:RES.fecha, desde:RES.desde, personas:RES.pax,
       nombre:v('nombre'), tel:v('tel'), nota:v('nota') });
-    RES.ticket = { ...r.reserva, tel:v('tel') }; RES.seguro = false;
+    RES.ticket = { nota:v('nota'), ...r.reserva, tel:v('tel') }; RES.seguro = false;
     guardarTicket();
     try { localStorage.setItem(LS_DATOS, JSON.stringify({ nombre:v('nombre'), tel:v('tel') })); } catch (e) {}
     RES.mesa = null; enviarHold();

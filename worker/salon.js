@@ -21,8 +21,10 @@ const CONFIG_BASE = {
     // cuántas mesas se pueden juntar como máximo (solo las marcadas `unible`)
     juntarCabezales: 2,
     // lugares extra en los cabezales de las mesas juntas (2 mesas de 2 = 4 + 2 = 6)
-    juntarDist: 12.5
+    juntarDist: 12.5,
     // distancia máxima entre bordes (en el plano) para considerarlas juntas
+    gruposGrandes: [["7", "8", "9"], ["12", "13", "14"]]
+    // para 7 u 8 personas: estas tres mesas de 2 en fila se juntan (6 + 2 cabezales = 8). No se editan desde el panel.
   },
   // minutos desde las 00:00 del día de servicio; 1470 = 00:30 y 1500 = 01:00 de la madrugada siguiente
   horarios: {
@@ -227,24 +229,28 @@ export class Salon extends DurableObject {
     if (!ms.length || ids.length > 6 || ms.some((x) => !x)) throw new ErrorHttp(400, "Elegí una mesa", "mesa");
     return ms.sort((x, y) => x.id.localeCompare(y.id, "es", { numeric: true }));
   }
-  /* Las mesas elegidas por un cliente: una sola, o varias de 2 pegadas entre sí, sin mesas de sobra. */
+  /* Las mesas elegidas por un cliente: una sola, varias de 2 pegadas entre sí, o uno de los grupos
+     grandes (para 7 u 8), sin mesas de sobra. */
   validarMesas(ms, personas) {
     const s = this.config().settings;
     if (ms.length === 1) {
       if (personas > ms[0].personas) throw new ErrorHttp(400, `Esa mesa es para hasta ${ms[0].personas} personas`, "personas");
       return;
     }
-    if (ms.length > s.juntarMax) throw new ErrorHttp(400, `Se pueden juntar hasta ${s.juntarMax} mesas`, "juntar");
-    if (ms.some((m) => !m.unible)) throw new ErrorHttp(400, "Esas mesas no se pueden juntar", "juntar");
-    const vistas = new Set([ms[0].id]), cola = [ms[0]];
-    while (cola.length) {
-      const a = cola.pop();
-      for (const b of ms) if (!vistas.has(b.id) && this.hueco(a, b) <= s.juntarDist) {
-        vistas.add(b.id);
-        cola.push(b);
+    const grande = (s.gruposGrandes || []).some((g) => g.length === ms.length && ms.every((m) => g.includes(m.id)));
+    if (!grande) {
+      if (ms.length > s.juntarMax) throw new ErrorHttp(400, `Se pueden juntar hasta ${s.juntarMax} mesas`, "juntar");
+      if (ms.some((m) => !m.unible)) throw new ErrorHttp(400, "Esas mesas no se pueden juntar", "juntar");
+      const vistas = new Set([ms[0].id]), cola = [ms[0]];
+      while (cola.length) {
+        const a = cola.pop();
+        for (const b of ms) if (!vistas.has(b.id) && this.hueco(a, b) <= s.juntarDist) {
+          vistas.add(b.id);
+          cola.push(b);
+        }
       }
+      if (vistas.size !== ms.length) throw new ErrorHttp(400, "Para juntarlas, las mesas tienen que estar una al lado de la otra", "juntar");
     }
-    if (vistas.size !== ms.length) throw new ErrorHttp(400, "Para juntarlas, las mesas tienen que estar una al lado de la otra", "juntar");
     const cap = this.capGrupo(ms);
     if (personas > cap) throw new ErrorHttp(400, `Esas mesas juntas son para hasta ${cap} personas`, "personas");
     if (ms.some((_, i) => this.capGrupo(ms.filter((__, j) => j !== i)) >= personas)) throw new ErrorHttp(400, "Para esa cantidad de personas alcanza con menos mesas", "juntar");
@@ -454,7 +460,8 @@ export class Salon extends DurableObject {
         anticipacionMin: c.settings.anticipacionMin,
         juntarMax: c.settings.juntarMax,
         juntarCabezales: c.settings.juntarCabezales,
-        juntarDist: c.settings.juntarDist
+        juntarDist: c.settings.juntarDist,
+        gruposGrandes: c.settings.gruposGrandes
       },
       horarios: c.horarios,
       maxPersonas: this.maxPersonas(),
@@ -552,7 +559,7 @@ export class Salon extends DurableObject {
     const fila = this.crearReserva(b);
     this.difundir({ t: "cambio", fecha: fila.fecha });
     this.difundir({ t: "admin", evento: "reserva_nueva", reserva: this.vistaReserva(fila) }, true);
-    return this.resp({ ok: true, reserva: { codigo: fila.codigo, mesa: fila.mesa, fecha: fila.fecha, desde: fila.desde, hasta: fila.hasta, personas: fila.personas, nombre: fila.nombre } }, 201);
+    return this.resp({ ok: true, reserva: { codigo: fila.codigo, mesa: fila.mesa, fecha: fila.fecha, desde: fila.desde, hasta: fila.hasta, personas: fila.personas, nombre: fila.nombre, nota: fila.nota } }, 201);
   }
   rCancelarCliente(b) {
     const codigo = limpiar(b.codigo, 10).toUpperCase();
