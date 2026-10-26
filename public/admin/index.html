@@ -331,7 +331,7 @@ const ESTADO_PED = { nuevo:'Nuevo', confirmado:'Confirmado', entregado:'Entregad
 /* ══════════════ estado ══════════════ */
 const S = {
   tab: 'hoy', cfg: null, hoy: ahoraAR(),
-  fecha: ahoraAR().fecha, desde: null, resDia: [], pedDia: [],
+  fecha: ahoraAR().fecha, desde: null, resDia: [], pedDia: [], resProx: [],
   fRes: { desde: ahoraAR().fecha, hasta: sumarDias(ahoraAR().fecha, 14), estado: '', q: '' }, reservas: [],
   fPed: { desde: sumarDias(ahoraAR().fecha, -6), hasta: ahoraAR().fecha, estado: '', q: '' }, pedidos: [],
   rango: 30, stats: null,
@@ -423,7 +423,7 @@ function conectar() {
     else if (m.t === 'carta') { if (S.tab === 'carta' && !cartaCambiada() && !menuCambiado()) cargarCarta(); }
     else if (m.t === 'salon') { api('/api/admin/salon').then(c => { S.cfg = c; refrescarSuave(); }).catch(() => {}); }
     else if (m.t === 'admin') {
-      if (m.evento === 'reserva_nueva') { const r = m.reserva; avisar(`Nueva reserva · ${txtMesa(r)} · ${fCorta(r.fecha)} ${hhmm(r.desde)} · ${r.nombre} (${r.personas})`, 'nuevo'); bip(); }
+      if (m.evento === 'reserva_nueva') { const r = m.reserva; avisar(`Nueva reserva · ${txtMesa(r)} · ${fCorta(r.fecha)} ${hhmm(r.desde)} · ${r.nombre} (${r.personas})${r.nota ? ' · “' + r.nota + '”' : ''}`, 'nuevo'); bip(); }
       else if (m.evento === 'reserva_cancelada') { const r = m.reserva; avisar(`Reserva cancelada · ${txtMesa(r)} · ${fCorta(r.fecha)} ${hhmm(r.desde)} · ${r.nombre}`); }
       else if (m.evento === 'socio_nuevo') { avisar(`Nuevo socio desde la web · Nº ${m.socio.numeroTxt} · ${m.socio.nombre}`, 'nuevo'); bip(); if (S.tab === 'club') cargarClub(true); }
       else if (m.evento === 'pedido_nuevo') { const p = m.pedido; avisar(`Nuevo pedido · ${plata(p.total)}${p.nombre ? ' · ' + p.nombre : ''}`, 'nuevo'); bip(); if (S.tab !== 'pedidos') { S.nuevos++; pintarNuevos(); } }
@@ -571,6 +571,10 @@ function vistaHoy() {
       </div>
     </div>
     <div class="card" style="margin-top:14px">
+      <div class="card__tit"><span>PRÓXIMAS RESERVAS</span><small data-h-pxcuenta></small></div>
+      <div class="lista" data-h-proximas></div>
+    </div>
+    <div class="card" style="margin-top:14px">
       <div class="card__tit"><span>PEDIDOS DEL DÍA</span><small data-h-pcuenta></small></div>
       <div class="lista" data-h-pedidos></div>
     </div>`;
@@ -579,12 +583,14 @@ function vistaHoy() {
 async function cargarHoy(suave) {
   const f = S.fecha;
   try {
-    const [a, b] = await Promise.all([
+    // las reservas de los días siguientes también, para que una reserva nueva se vea apenas se abre el panel
+    const [a, b, px] = await Promise.all([
       api('/api/admin/reservas?' + qs({ desde: f, hasta: f })),
       api('/api/admin/pedidos?' + qs({ desde: f, hasta: f })),
+      api('/api/admin/reservas?' + qs({ desde: sumarDias(f, 1), hasta: sumarDias(f, S.cfg.settings.diasAdelante || 30) })),
     ]);
     if (S.tab !== 'hoy' || f !== S.fecha) return;
-    S.resDia = a.reservas; S.pedDia = b.pedidos;
+    S.resDia = a.reservas; S.pedDia = b.pedidos; S.resProx = px.reservas.filter(activa);
     // horario por defecto: el turno actual (si es hoy) o el primero del día
     const ts = turnosDe(f);
     if (S.desde == null || !ts.includes(S.desde) || !suave) {
@@ -622,13 +628,20 @@ function pintarHoy() {
 
   const ag = S.resDia.slice().sort((a, b) => a.desde - b.desde || parseInt(a.mesa) - parseInt(b.mesa));
   $('[data-h-cuenta]').textContent = ag.length ? ag.length + (ag.length === 1 ? ' reserva' : ' reservas') : '';
-  $('[data-h-agenda]').innerHTML = ag.length ? ag.map(itemReserva).join('') : '<p class="vacio">No hay reservas para este día.</p>';
+  $('[data-h-agenda]').innerHTML = ag.length ? ag.map(r => itemReserva(r)).join('') : '<p class="vacio">No hay reservas para este día.</p>';
+  let ult = '', prox = '';
+  for (const r of S.resProx) {
+    if (r.fecha !== ult) { ult = r.fecha; prox += `<button class="eyebrow" type="button" data-ir-dia="${r.fecha}" style="text-align:left;margin:10px 2px 0;color:var(--gris)">${esc(fLarga(r.fecha))} · ver en el plano ▸</button>`; }
+    prox += itemReserva(r, false);
+  }
+  $('[data-h-pxcuenta]').textContent = S.resProx.length ? S.resProx.length + (S.resProx.length === 1 ? ' reserva' : ' reservas') : '';
+  $('[data-h-proximas]').innerHTML = prox || '<p class="vacio">No hay reservas para los próximos días.</p>';
   $('[data-h-pcuenta]').textContent = S.pedDia.length ? S.pedDia.length + (S.pedDia.length === 1 ? ' pedido' : ' pedidos') : '';
   $('[data-h-pedidos]').innerHTML = S.pedDia.length ? S.pedDia.map(itemPedido).join('') : '<p class="vacio">Todavía no entraron pedidos por la web.</p>';
 }
 const zonaDe = r => { const id = mesasDe(r)[0]; const m = S.cfg && S.cfg.mesas.find(x => x.id === id); return m && adentro(m) ? 'Adentro · ' : ''; };
-function itemReserva(r) {
-  const rapidas = r.estado === 'confirmada' ? `
+function itemReserva(r, conAcciones = true) {
+  const rapidas = !conAcciones ? '' : r.estado === 'confirmada' ? `
     <div class="acciones">
       <span role="button" class="btn btn--verde btn--chico" data-est-res="${r.id}|sentada">Llegó</span>
       <span role="button" class="btn btn--claro btn--chico" data-est-res="${r.id}|no_vino">No vino</span>
@@ -1407,7 +1420,7 @@ document.addEventListener('click', async ev => {
     try { await post('/api/admin/pedidos/' + el.dataset.borrarPed, {}, 'DELETE'); avisar('Pedido eliminado'); cerrarModal(); refrescarSuave(); } catch (e) { avisar(e.message, 'error'); }
     return;
   }
-  if ((el = c('[data-reserva]'))) { const r = [...S.resDia, ...S.reservas].find(x => x.id === +el.dataset.reserva); if (r) abrirReserva(r); return; }
+  if ((el = c('[data-reserva]'))) { const r = [...S.resDia, ...S.resProx, ...S.reservas].find(x => x.id === +el.dataset.reserva); if (r) abrirReserva(r); return; }
   if ((el = c('[data-pedido]'))) { const p = [...S.pedDia, ...S.pedidos].find(x => x.id === +el.dataset.pedido); if (p) abrirPedido(p); return; }
 
   /* hoy */
@@ -1417,6 +1430,7 @@ document.addEventListener('click', async ev => {
     $('[data-h-fecha]').value = S.fecha; cargarHoy(); return;
   }
   if ((el = c('[data-hh]'))) { S.desde = +el.dataset.hh; pintarHoy(); return; }
+  if ((el = c('[data-ir-dia]'))) { S.fecha = el.dataset.irDia; S.desde = null; $('[data-h-fecha]').value = S.fecha; cargarHoy(); window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
   if ((el = c('[data-nueva]'))) {
     const ts = turnosDe(S.fecha);
     abrirReserva({ fecha: S.fecha, desde: S.desde ?? ts[0] ?? 1200, mesa: S.cfg.mesas[0].id, personas: 2, nombre: '', tel: '', nota: '' }); return;

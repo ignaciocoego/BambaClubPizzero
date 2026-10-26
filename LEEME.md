@@ -75,6 +75,12 @@ wrangler.jsonc       configuración (bindings ASSETS y SALON)
   lunes cerrado.
 - Turnos de reserva: `settings.turnos` en `worker/salon.js` (20:00 y 21:30). El de las
   20:00 termina a las 21:30 (`finTurno`). No se editan desde el panel.
+- Grupos de 7 u 8: además de las mesas de 8, se pueden reservar las mesas 7, 8 y 9 juntas o
+  las 12, 13 y 14 juntas (`settings.gruposGrandes` en `worker/salon.js`; 3 mesas de 2 = 6 más
+  2 en los cabezales = 8). No dependen de la distancia en el plano. No se editan desde el panel.
+- La nota de la reserva ("referencia": cumpleaños, alergias…) va en el ticket, en el mensaje de
+  WhatsApp que manda el cliente y en el panel. El panel muestra en HOY las próximas reservas
+  de los días siguientes.
 
 ## Club Bamba (socios)
 
