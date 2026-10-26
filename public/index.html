@@ -190,6 +190,7 @@ a{color:var(--rojo);text-decoration:none}
 }
 .btn--claro{flex:1;background:var(--crema);color:var(--rojo);box-shadow:0 3px 0 rgba(0,0,0,.32)}
 .btn--azul{flex:1;background:var(--azul);color:#fff;box-shadow:0 3px 0 rgba(0,0,0,.32)}
+.hero__club{display:inline-block;margin-top:14px;font-size:13px;font-weight:800;letter-spacing:.03em;color:#fff;text-decoration:underline;text-underline-offset:3px}
 
 /* ---------- marquesina ---------- */
 .marquee{background:var(--azul);color:#fff;overflow:hidden;padding:10px 0;white-space:nowrap}
@@ -596,6 +597,7 @@ body.splash-activo{overflow:hidden}
         <a class="btn btn--claro" href="#carta">Ver el menú</a>
         <a class="btn btn--azul" href="#reservas">Reservar</a>
       </div>
+      <a class="hero__club" href="/club/#alta" data-hero-club>★ Hacete socio del Club Bamba y sumá puntos</a>
     </div>
   </section>
 
@@ -848,7 +850,7 @@ const WA = '5491138693024';
    (pestaña Carta) la reemplaza al cargar: ver cargarCartaViva(). */
 const MENU = JSON.parse(JSON.stringify(window.BAMBA_MENU || []));
 
-const MODOS = ['Retiro en el local', 'Delivery', 'Mesa en el local'];
+const MODOS = ['Retiro en el local', 'Delivery'];   // para comer en el local están las reservas
 const PAGOS = ['Efectivo', 'Débito / Crédito', 'Mercado Pago'];
 
 /* ══════════════════════════════════════════════════════════
@@ -1254,7 +1256,7 @@ function pintarPedido() {
         </div>
         ${comoSocio ? `Este pedido le suma <b>${puntosPedido} ${puntosPedido === 1 ? 'punto' : 'puntos'}</b> a ${esc(socio.nombre)} cuando lo entreguemos.` : 'Pedís sin sumar puntos del Club.'}
       </div>` : `
-      <div class="socio-box">¿Sos socio del Club Bamba? <a href="/club/">Abrí tu credencial</a> en este celular y sumá puntos con este pedido.</div>`;
+      <div class="socio-box">¿Sos socio del Club Bamba? <a href="/club/#entrar">Abrí tu credencial</a> en este celular y sumá puntos con este pedido. ¿Todavía no? <a href="/club/#alta">Hacete socio gratis</a>: es al toque y tu pedido no se pierde.</div>`;
 
   const datos = !checkout ? '' : `
     <div style="margin-top:18px;display:flex;flex-direction:column;gap:15px">
@@ -1359,6 +1361,8 @@ async function iniciarClub() {
   if (socio) {
     $('[data-club-txt]').innerHTML = `Hola, <b>${esc(String(socio.nombre || '').split(' ')[0])}</b>. Sos el socio Nº ${esc(socio.numeroTxt)}: tus pedidos desde esta web suman puntos.`;
     $('[data-club-acc]').innerHTML = `<a class="c1" href="/club/${encodeURIComponent(socio.token)}/">Ver mi credencial</a><a class="c2" href="#carta">Pedir y sumar</a>`;
+    const h = $('[data-hero-club]');
+    if (h) { h.href = '/club/' + encodeURIComponent(socio.token) + '/'; h.textContent = '★ Socio Nº ' + socio.numeroTxt + ' · Ver mi credencial'; }
   }
   if (!/^https?:$/.test(location.protocol)) return;
   try {
