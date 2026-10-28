@@ -54,6 +54,8 @@ wrangler.jsonc       configuración (bindings ASSETS y SALON)
 - La web es solo para pedir take away: el pedido es siempre "Retiro en el local" (por ahora no
   hay delivery; `MODO` en `public/index.html`). Para comer en el local están las reservas. Por
   eso la carta no tiene café, cervezas tiradas, tragos ni copas de vino.
+- Al mandar el pedido por WhatsApp, la web muestra "¡Pedido enviado!" y vacía el carrito (con un
+  link para volver a abrir WhatsApp si no se abrió).
 
 - **Empanadas**: no se les puede sacar ni agregar nada. En `MENU` la sección lleva
   `personalizable:false`, que le gana a `sacable` y a `ing`. Sirve igual para un plato suelto.

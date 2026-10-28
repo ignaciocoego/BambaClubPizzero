@@ -516,6 +516,7 @@ a{color:var(--rojo);text-decoration:none}
 .vacio__txt{font-size:13px;color:var(--gris);margin-top:5px}
 .vacio__btn{margin-top:16px;background:var(--rojo);color:#fff;border-radius:12px;padding:13px 22px;
   font-size:13.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase}
+.enviado__otra{display:block;margin-top:14px;font-size:12.5px;color:var(--gris);text-decoration:underline}
 
 .total{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:11px}
 .total__rot{font-size:12px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--gris)}
@@ -874,6 +875,7 @@ const ficha = { prod:null, kind:'menu', qty:1, variant:0, sacar:[], extras:[], n
 const datosForm = { nombre:'', tel:'', hora:'', nota:'' };
 let errorMsg = '';
 let checkout = false;
+let enviado = null;   // el último pedido mandado por WhatsApp ({ link, puntos }), para mostrar "Pedido enviado"
 let pago = PAGOS[0], pax = 2;
 
 /* Club Bamba: si en este celular se abrió la credencial de un socio, el pedido puede ir a su nombre y sumar puntos. */
@@ -1234,6 +1236,17 @@ function pintarPedido() {
 
   if (!cart.length) {
     pie.hidden = true;
+    if (enviado) {
+      $('[data-pedido-tit]').textContent = 'PEDIDO ENVIADO';
+      cuerpo.innerHTML = `
+      <div class="vacio">
+        <p class="vacio__tit">¡Pedido enviado!</p>
+        <p class="vacio__txt">Te abrimos WhatsApp con tu pedido: mandá el mensaje y te confirmamos por ahí. Lo retirás en Monseñor Piaggio 98.${enviado.puntos ? ` Cuando lo entreguemos te sumamos <b>${enviado.puntos} ${enviado.puntos === 1 ? 'punto' : 'puntos'}</b>.` : ''}</p>
+        <button class="vacio__btn" type="button" data-cerrar-pedido>Listo</button>
+        <a class="enviado__otra" href="${esc(enviado.link)}" target="_blank" rel="noopener">¿No se abrió WhatsApp? Abrilo de nuevo</a>
+      </div>`;
+      return;
+    }
     cuerpo.innerHTML = `
       <div class="vacio">
         <p class="vacio__tit">Todavía no elegiste nada</p>
@@ -1316,6 +1329,7 @@ function pintarPedido() {
 function abrirPedido() {
   checkout = false;
   errorMsg = '';
+  enviado = null;
   pintarPedido();
   $('[data-modal-pedido]').hidden = false;
   document.body.style.overflow = 'hidden';
@@ -1351,9 +1365,15 @@ function enviarPedido() {
   L.push('', '*TOTAL: ' + plata(total()) + '*');
   if (datosForm.nota) L.push('', '*Notas:* ' + datosForm.nota);
   L.push('', '_Enviado desde la web_');
+  const link = 'https://wa.me/' + WA + '?text=' + encodeURIComponent(L.join('\n'));
   registrarPedido();
-  window.open('https://wa.me/' + WA + '?text=' + encodeURIComponent(L.join('\n')), '_blank', 'noopener');
+  window.open(link, '_blank', 'noopener');
   avisar('Abriendo WhatsApp...');
+  // el pedido ya salió: se vacía el carrito para que no quede cargado (ni se mande dos veces)
+  enviado = { link, puntos: comoSocio && socio ? Math.floor(total() / pesosPorPunto) : 0 };
+  cart = []; guardar();
+  checkout = false; datosForm.nota = '';
+  pintarPedido(); pintarBarra();
 }
 
 /* Deja constancia del pedido en el panel de los dueños. Es en segundo plano:
