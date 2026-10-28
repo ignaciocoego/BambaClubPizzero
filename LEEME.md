@@ -61,6 +61,10 @@ wrangler.jsonc       configuración (bindings ASSETS y SALON)
   de la porción por cada pizza al molde). Se guarda en el Durable Object (`config`, clave
   `carta`) y la web lo lee de `/api/carta` al cargar (y al instante si está abierta). Si el
   sistema no responde, usa lo último que vio o las variantes "Por porción" de `MENU`.
+- En la web, las porciones van en su propia sección **Por porción**, abajo de Bamba al molde
+  (`seccionesCarta()`), para que estén a la vista. Desde al molde se pide la pizza entera y
+  desde Por porción, la porción: no se elige adentro de cada pizza. A la porción no se le sacan
+  ingredientes (ya está hecha).
 - La lista de pizzas está en `worker/carta.js` (`PIZZAS_MOLDE`, con los mismos `id` que en
   `MENU`). Si se suma una pizza al molde a la carta, hay que sumarla ahí también.
 - Si una porción se apaga o cambia de precio, la web la saca (o corrige) del pedido sin

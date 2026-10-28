@@ -1012,12 +1012,24 @@ async function cargarPorciones() {
   } catch (e) {}
 }
 
+/* Las pizzas que se venden por porción se repiten en su propia sección, abajo de la de al molde,
+   para que estén a la vista (y no haya que entrar a cada pizza para ver si se vende así). */
+function seccionesCarta() {
+  const out = [];
+  for (const sec of MENU) {
+    out.push(sec);
+    const porc = sec.porcionable ? sec.items.filter(porcionDe) : [];
+    if (porc.length) out.push({ id:'por-porcion', title:'POR PORCIÓN', badge:'AL MOLDE', color:sec.color, de:sec, items:porc });
+  }
+  return out;
+}
+
 function pintarCarta() {
-  const activa = catActiva;
-  $('[data-cats]').innerHTML = MENU.map(s => `
+  const activa = catActiva, secciones = seccionesCarta();
+  $('[data-cats]').innerHTML = secciones.map(s => `
     <button class="chip" type="button" role="tab" data-cat="${s.id}" aria-selected="${s.id === activa}">${esc(s.title)}</button>`).join('');
 
-  $('[data-secciones]').innerHTML = MENU.map(sec => `
+  $('[data-secciones]').innerHTML = secciones.map(sec => `
     <div class="grupo" id="${sec.id}" style="color:var(--${sec.color})">
       <div class="grupo__enc">
         <h3 class="grupo__tit">${esc(sec.title)}</h3>
@@ -1026,16 +1038,15 @@ function pintarCarta() {
       <div style="color:var(--tinta)">
         ${sec.especial === 'mitad' ? tarjetaMitad() : ''}
         ${sec.items.map(it => {
-          const base = it.variants ? it.variants[0].price : it.price;
+          const base = sec.de ? porcionDe(it).price : it.variants ? it.variants[0].price : it.price;
           return `
-          <button class="plato" type="button" data-plato="${sec.id}|${it.id}">
+          <button class="plato" type="button" data-plato="${sec.de ? sec.de.id + '|' + it.id + '|porcion' : sec.id + '|' + it.id}">
             <span style="flex:1;min-width:0">
               <span class="plato__nom" style="display:block;color:var(--${sec.color})">${esc(it.name)}</span>
-              ${it.desc ? `<span class="plato__desc" style="display:block">${esc(it.desc)}</span>` : ''}
+              ${sec.de ? '<span class="plato__desc" style="display:block">La porción.</span>' : it.desc ? `<span class="plato__desc" style="display:block">${esc(it.desc)}</span>` : ''}
             </span>
             <span class="plato__pre">
               <span class="plato__val" style="display:block">${plata(base)}</span>
-              ${porcionDe(it) ? `<span class="plato__nota" style="display:block">porción ${plata(porcionDe(it).price)}</span>` : ''}
             </span>
             <span class="plato__mas" aria-hidden="true">+</span>
           </button>`;
@@ -1118,14 +1129,16 @@ function refrescarFicha() {
   }
 }
 
-function abrirFicha(prod, sec) {
-  Object.assign(ficha, { prod, sec:sec || null, kind:'menu', qty:1, variant:0, sacar:[], sacarTxt:'', extras:[], nota:'', mitades:[] });
+function abrirFicha(prod, sec, variante) {
+  // las pizzas que se venden por porción no se eligen adentro: desde al molde va la entera y desde "Por porción", la porción
+  const porcion = !!porcionDe(prod), vi = porcion && variante === PORCION ? prod.variants.indexOf(porcionDe(prod)) : 0;
+  Object.assign(ficha, { prod, sec:sec || null, kind:'menu', qty:1, variant:vi, sacar:[], sacarTxt:'', extras:[], nota:'', mitades:[] });
 
-  $('[data-ficha-nom]').textContent  = prod.name;
+  $('[data-ficha-nom]').textContent  = prod.name + (porcion && vi ? ' · porción' : '');
   $('[data-ficha-desc]').textContent = prod.desc || '';
 
   const bloques = [];
-  if (prod.variants) {
+  if (prod.variants && !porcion) {
     bloques.push(`
       <div class="bloque">
         <p class="bloque__rot">${esc(prod.variantLabel || 'Elegí')}</p>
@@ -1137,7 +1150,7 @@ function abrirFicha(prod, sec) {
         </div>
       </div>`);
   }
-  if (puedeSacar()) bloques.push(`<div class="bloque" data-bloque-sacar>${htmlSacar()}</div>`);
+  if (puedeSacar() && !(porcion && vi)) bloques.push(`<div class="bloque" data-bloque-sacar>${htmlSacar()}</div>`);   // la porción ya está hecha
   bloques.push(`
     <div class="bloque" style="margin-bottom:4px">
       <p class="bloque__rot">Nota para la cocina</p>
@@ -1403,7 +1416,7 @@ document.addEventListener('click', ev => {
     const partes = el.dataset.plato.split('|');
     const sec = MENU.find(s => s.id === partes[0]);
     const it = sec && sec.items.find(i => i.id === partes[1]);
-    if (it) abrirFicha(it, sec);
+    if (it) abrirFicha(it, sec, partes[2] === 'porcion' ? PORCION : null);
     return;
   }
 
@@ -2071,7 +2084,7 @@ async function cancelarReserva() {
 let catActiva = MENU[0].id;
 function spy() {
   let act = catActiva;
-  for (const s of MENU) {
+  for (const s of seccionesCarta()) {
     const el = document.getElementById(s.id);
     if (el && el.getBoundingClientRect().top < 200) act = s.id;
   }
