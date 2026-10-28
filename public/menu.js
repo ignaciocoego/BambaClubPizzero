@@ -9,7 +9,7 @@
    porcionable: las pizzas de la sección se pueden vender por porción. Cuáles sí y a qué precio lo
    decide el dueño en el panel (pestaña Carta); las variantes "Por porción" de acá son el valor por
    defecto si el sistema no responde. */
-/* La web es para pedir take away o delivery: no va nada que solo se sirve en el local
+/* La web es para pedir take away (retiro en el local, no hay delivery): no va nada que solo se sirve en el local
    (café, cervezas tiradas, tragos, copas de vino). */
 window.BAMBA_MENU = [
   { id:'mas-alla', sacable:true, title:'MÁS ALLÁ DE LA PIZZA', color:'azul', items:[

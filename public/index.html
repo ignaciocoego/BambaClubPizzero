@@ -376,6 +376,8 @@ a{color:var(--rojo);text-decoration:none}
 .socio-box{background:var(--azul-suave);border-radius:14px;padding:12px 13px;font-size:12.5px;line-height:1.4;color:var(--azul-hondo)}
 .socio-box .opciones{margin-bottom:9px}
 .socio-box a{font-weight:800;color:var(--azul);text-decoration:underline}
+.retiro{background:var(--papel);border:1.5px solid var(--linea);border-radius:14px;padding:11px 13px;font-size:12.5px;line-height:1.4;color:var(--gris)}
+.retiro b{display:block;font-size:11px;font-weight:800;letter-spacing:.13em;text-transform:uppercase;color:var(--rojo-osc);margin-bottom:2px}
 
 /* ---------- visitarnos ---------- */
 .local{background:var(--papel);border:1.5px solid var(--linea);border-radius:18px;overflow:hidden}
@@ -850,7 +852,7 @@ const WA = '5491138693024';
    (pestaña Carta) la reemplaza al cargar: ver cargarCartaViva(). */
 const MENU = JSON.parse(JSON.stringify(window.BAMBA_MENU || []));
 
-const MODOS = ['Retiro en el local', 'Delivery'];   // para comer en el local están las reservas
+const MODO = 'Retiro en el local';   // no hay delivery; para comer en el local están las reservas
 const PAGOS = ['Efectivo', 'Débito / Crédito', 'Mercado Pago'];
 
 /* ══════════════════════════════════════════════════════════
@@ -866,7 +868,7 @@ const ficha = { prod:null, kind:'menu', qty:1, variant:0, sacar:[], extras:[], n
 const datosForm = { nombre:'', tel:'', hora:'', nota:'' };
 let errorMsg = '';
 let checkout = false;
-let modo = MODOS[0], pago = PAGOS[0], pax = 2;
+let pago = PAGOS[0], pax = 2;
 
 /* Club Bamba: si en este celular se abrió la credencial de un socio, el pedido puede ir a su nombre y sumar puntos. */
 const LS_SOCIO = 'bamba_socio';
@@ -1261,12 +1263,7 @@ function pintarPedido() {
   const datos = !checkout ? '' : `
     <div style="margin-top:18px;display:flex;flex-direction:column;gap:15px">
       ${bloqueSocio}
-      <div>
-        <p class="bloque__rot">¿Cómo lo querés?</p>
-        <div class="opciones">
-          ${MODOS.map(m => `<button class="chip" type="button" data-modo="${esc(m)}" aria-selected="${m === modo}">${esc(m)}</button>`).join('')}
-        </div>
-      </div>
+      <p class="retiro"><b>Retiro en el local</b>Monseñor Piaggio 98, Avellaneda. No hacemos delivery.</p>
       <div style="display:flex;flex-direction:column;gap:9px">
         <input class="dato" data-f="nombre" placeholder="Nombre y apellido *" autocomplete="name" value="${esc(datosForm.nombre)}">
         <input class="dato" data-f="tel" type="tel" inputmode="tel" placeholder="Teléfono *" autocomplete="tel" value="${esc(datosForm.tel)}">
@@ -1313,7 +1310,7 @@ function enviarPedido() {
   const L = ['*NUEVO PEDIDO — BAMBA CLUB PIZZERO*', ''];
   L.push('*Nombre:* ' + datosForm.nombre);
   L.push('*Teléfono:* ' + datosForm.tel);
-  L.push('*Modalidad:* ' + modo);
+  L.push('*Modalidad:* ' + MODO);
   if (datosForm.hora) L.push('*Horario deseado:* ' + datosForm.hora);
   L.push('*Pago:* ' + pago);
   if (comoSocio && socio) L.push('*Socio Club Bamba:* Nº ' + socio.numeroTxt);
@@ -1340,7 +1337,7 @@ function registrarPedido() {
     fetch('/api/pedidos', {
       method:'POST', keepalive:true, headers:{ 'content-type':'application/json' },
       body:JSON.stringify({ ref:refPedido, socio:comoSocio && socio ? socio.token : undefined,
-        nombre:datosForm.nombre, tel:datosForm.tel, modo, pago, horario:datosForm.hora,
+        nombre:datosForm.nombre, tel:datosForm.tel, modo:MODO, pago, horario:datosForm.hora,
         nota:datosForm.nota, items:cart.map(l => ({ id:l.id, name:l.name, variant:l.variant, sacar:(l.sacar || []).join(', '), nota:l.nota, qty:l.qty, unit:l.unit })) }),
     }).catch(() => {});
   } catch (e) {}
@@ -1443,11 +1440,6 @@ document.addEventListener('click', ev => {
   if ((el = cerca('[data-quitar]'))) {
     cart = cart.filter(l => l.key !== el.dataset.key);
     guardar(); pintarPedido(); pintarBarra(); return;
-  }
-  if ((el = cerca('[data-modo]'))) {
-    modo = el.dataset.modo;
-    $$('[data-modo]').forEach(b => b.setAttribute('aria-selected', String(b === el)));
-    return;
   }
   if ((el = cerca('[data-pago]'))) { pago = el.dataset.pago; pintarPedido(); return; }
   if ((el = cerca('[data-como]'))) {

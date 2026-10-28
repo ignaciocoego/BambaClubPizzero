@@ -51,9 +51,9 @@ wrangler.jsonc       configuración (bindings ASSETS y SALON)
 - `public/menu.js` es la carta original (la comparten la web y el panel). Las opciones de cada
   plato (cocción, relleno, etc.) se cambian ahí; si un plato cambia de precio en el panel, las
   opciones que costaban lo mismo siguen al precio nuevo.
-- La web es solo para pedir take away o delivery ("Retiro en el local" o "Delivery"; para comer
-  en el local están las reservas). Por eso la carta no tiene café, cervezas tiradas, tragos ni
-  copas de vino.
+- La web es solo para pedir take away: el pedido es siempre "Retiro en el local" (por ahora no
+  hay delivery; `MODO` en `public/index.html`). Para comer en el local están las reservas. Por
+  eso la carta no tiene café, cervezas tiradas, tragos ni copas de vino.
 
 - **Empanadas**: no se les puede sacar ni agregar nada. En `MENU` la sección lleva
   `personalizable:false`, que le gana a `sacable` y a `ing`. Sirve igual para un plato suelto.
