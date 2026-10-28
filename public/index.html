@@ -377,6 +377,9 @@ a{color:var(--rojo);text-decoration:none}
 .clubsec__acc .c2{background:rgba(0,0,0,.22);color:#fff}
 .socio-box{background:var(--azul-suave);border-radius:14px;padding:12px 13px;font-size:12.5px;line-height:1.4;color:var(--azul-hondo)}
 .socio-box .opciones{margin-bottom:9px}
+.socio-fila{display:flex;gap:8px;margin:9px 0}
+.socio-fila .dato{flex:1;min-width:0;padding:10px 12px}
+.socio-fila .chip{border-radius:11px;padding:0 16px;font-size:13px;background:var(--azul);border-color:var(--azul);color:#fff}
 .socio-box a{font-weight:800;color:var(--azul);text-decoration:underline}
 .retiro{background:var(--papel);border:1.5px solid var(--linea);border-radius:14px;padding:11px 13px;font-size:12.5px;line-height:1.4;color:var(--gris)}
 .retiro b{display:block;font-size:11px;font-weight:800;letter-spacing:.13em;text-transform:uppercase;color:var(--rojo-osc);margin-bottom:2px}
@@ -880,6 +883,7 @@ try { socio = JSON.parse(localStorage.getItem(LS_SOCIO)); } catch (e) {}
 if (!socio || !socio.token) socio = null;
 let comoSocio = !!socio;
 let pesosPorPunto = 1000;
+let numSocio = '', socioErr = '', socioCargando = false;   // "¿Sos socio?" al final del pedido
 
 const $  = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
@@ -1274,11 +1278,18 @@ function pintarPedido() {
         </div>
         ${comoSocio ? `Este pedido le suma <b>${puntosPedido} ${puntosPedido === 1 ? 'punto' : 'puntos'}</b> a ${esc(socio.nombre)} cuando lo entreguemos.` : 'Pedís sin sumar puntos del Club.'}
       </div>` : `
-      <div class="socio-box">¿Sos socio del Club Bamba? <a href="/club/#entrar">Abrí tu credencial</a> en este celular y sumá puntos con este pedido. ¿Todavía no? <a href="/club/#alta">Hacete socio gratis</a>: es al toque y tu pedido no se pierde.</div>`;
+      <div class="socio-box">
+        <b>¿Sos socio del Club Bamba?</b> Poné tu número de socio y este pedido te suma <b>${puntosPedido} ${puntosPedido === 1 ? 'punto' : 'puntos'}</b>.
+        <div class="socio-fila">
+          <input class="dato" data-socio-num inputmode="numeric" placeholder="Nº de socio (ej: 0042)" maxlength="6" value="${esc(numSocio)}" aria-label="Número de socio">
+          <button class="chip" type="button" data-socio-sumar${socioCargando ? ' disabled' : ''}>${socioCargando ? 'Buscando…' : 'Sumar'}</button>
+        </div>
+        ${socioErr ? `<p class="error" style="margin-bottom:6px">${esc(socioErr)}</p>` : ''}
+        Va con el teléfono que pusiste arriba. ¿Todavía no sos socio? <a href="/club/#alta">Hacete socio gratis</a>: es al toque y tu pedido no se pierde.
+      </div>`;
 
   const datos = !checkout ? '' : `
     <div style="margin-top:18px;display:flex;flex-direction:column;gap:15px">
-      ${bloqueSocio}
       <p class="retiro"><b>Retiro en el local</b>Monseñor Piaggio 98, Avellaneda. No hacemos delivery.</p>
       <div style="display:flex;flex-direction:column;gap:9px">
         <input class="dato" data-f="nombre" placeholder="Nombre y apellido *" autocomplete="name" value="${esc(datosForm.nombre)}">
@@ -1295,6 +1306,7 @@ function pintarPedido() {
         </div>
       </div>
       <textarea class="area" rows="2" data-f="nota" placeholder="Notas o alergias del pedido">${esc(datosForm.nota)}</textarea>
+      ${bloqueSocio}
       <p class="error" data-error>${esc(errorMsg)}</p>
     </div>`;
 
@@ -1370,6 +1382,27 @@ function llenarConSocio() {
   if (!datosForm.nombre.trim()) datosForm.nombre = socio.nombre || '';
   if (!datosForm.tel.trim()) datosForm.tel = socio.tel || '';
 }
+/* "¿Sos socio?" al final del pedido: con el teléfono del pedido y el número de socio, sin salir de la página. */
+async function entrarComoSocio() {
+  const num = numSocio.trim(), tel = datosForm.tel.trim();
+  socioErr = !tel ? 'Poné arriba tu teléfono (el mismo con el que te hiciste socio).' : !num ? 'Poné tu número de socio.' : '';
+  if (socioErr || socioCargando) { pintarPedido(); return; }
+  socioCargando = true; pintarPedido();
+  try {
+    const r = await fetch('/api/club/entrar', { method:'POST', headers:{ 'content-type':'application/json' }, body:JSON.stringify({ tel, numero:num }) });
+    const j = await r.json().catch(() => null);
+    if (!r.ok || !j || !j.ok) { socioErr = (j && j.error) || 'No pudimos conectarnos. Probá de nuevo.'; return; }
+    const y = await fetch('/api/club/yo', { headers:{ 'x-socio':j.token }, cache:'no-store' }).then(x => x.json()).catch(() => null);
+    const s = y && y.ok ? y.socio : {};
+    socio = { token:j.token, numero:s.numero || +num, numeroTxt:s.numeroTxt || num.padStart(4, '0'), nombre:s.nombre || datosForm.nombre, tel:s.tel || tel };
+    try { localStorage.setItem(LS_SOCIO, JSON.stringify(socio)); } catch (e) {}
+    comoSocio = true; refPedido = null; numSocio = '';
+    iniciarClub();
+    avisar('¡Listo! Este pedido suma puntos');
+  } catch (e) { socioErr = 'No pudimos conectarnos. Probá de nuevo.'; }
+  finally { socioCargando = false; pintarPedido(); }
+}
+
 async function iniciarClub() {
   if (socio) {
     $('[data-club-txt]').innerHTML = `Hola, <b>${esc(String(socio.nombre || '').split(' ')[0])}</b>. Sos el socio Nº ${esc(socio.numeroTxt)}: tus pedidos desde esta web suman puntos.`;
@@ -1459,6 +1492,7 @@ document.addEventListener('click', ev => {
     guardar(); pintarPedido(); pintarBarra(); return;
   }
   if ((el = cerca('[data-pago]'))) { pago = el.dataset.pago; pintarPedido(); return; }
+  if (cerca('[data-socio-sumar]')) { entrarComoSocio(); return; }
   if ((el = cerca('[data-como]'))) {
     comoSocio = el.dataset.como === 'socio';
     refPedido = null;   // si cambia, es otro registro del pedido
@@ -1492,9 +1526,11 @@ document.addEventListener('input', ev => {
   if (t.matches('[data-ficha-nota]')) { ficha.nota = t.value; return; }
   if (t.matches('[data-ficha-sacartxt]')) { ficha.sacarTxt = t.value; return; }
   if (t.matches('[data-f]')) { datosForm[t.dataset.f] = t.value; }
+  if (t.matches('[data-socio-num]')) { numSocio = t.value; }
 });
 
 document.addEventListener('keydown', ev => {
+  if (ev.key === 'Enter' && ev.target.matches && ev.target.matches('[data-socio-num]')) { ev.preventDefault(); entrarComoSocio(); return; }
   if (ev.key !== 'Escape') return;
   if (!$('[data-modal-ficha]').hidden) { cerrarFicha(); return; }
   if (!$('[data-modal-pedido]').hidden) cerrarPedido();

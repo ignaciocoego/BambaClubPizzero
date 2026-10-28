@@ -110,8 +110,10 @@ Qué hay y cómo funciona:
   rangos. "Guardar imagen" baja la credencial con su diseño y el QR grande.
 - **Compras**: los pedidos web hechos en un celular donde se abrió la credencial salen
   "como socio" (o "como invitado", si el cliente lo elige) y **suman cuando el local los
-  marca Entregado**. Las compras en el local se cargan en la ficha del socio (escaneando el
-  QR o buscando por número).
+  marca Entregado**. Si en ese celular no se abrió la credencial, al final del pedido se puede
+  poner el número de socio (va con el teléfono del pedido, como "Ya soy socio") y el pedido sale
+  como socio. Las compras en el local se cargan en la ficha del socio (escaneando el QR o
+  buscando por número).
 - Arriba de todo, en la barra roja, está el botón **★ SOCIOS** (va a `/club/`, o a la credencial
   si ya se abrió en ese celular).
 - **Cumpleaños**: en el alta desde la web se elige con dos listas (día y mes), porque el teclado
