@@ -838,7 +838,8 @@ let rzT; window.addEventListener('resize', () => { clearTimeout(rzT); rzT = setT
 const qrSVG = texto => { const q = qrcode(0, 'M'); q.addData(texto); q.make(); return q.createSvgTag({ cellSize: 6, margin: 0, scalable: true }); };
 const fTs = ts => fCorta(new Date(ts - 3 * 3600 * 1000).toISOString().slice(0, 10));
 const cumpleTxt = c => c ? c.slice(3, 5) + '/' + c.slice(0, 2) : '';                 // "03-15" → "15/03"
-const deCumple = s => { const m = /^(\d{1,2})\/(\d{1,2})$/.exec(String(s).trim()); return m && +m[1] >= 1 && +m[1] <= 31 && +m[2] >= 1 && +m[2] <= 12 ? pad(+m[2]) + '-' + pad(+m[1]) : ''; };
+// "15/03", "15-03", "15.03" o "1503" (el teclado numérico del celular no tiene "/") → "03-15"
+const deCumple = s => { const t = String(s).trim(), m = /^(\d{1,2})\D+(\d{1,2})$/.exec(t) || /^(\d{2})(\d{2})$/.exec(t); return m && +m[2] >= 1 && +m[2] <= 12 && +m[1] >= 1 && +m[1] <= [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][m[2] - 1] ? pad(+m[2]) + '-' + pad(+m[1]) : ''; };
 const msgCredencial = (s, link) => `¡Hola ${s.nombre.split(' ')[0]}! Ya sos socio del Club Bamba (Nº ${s.numeroTxt}).\n\nEsta es tu credencial: ${link}\n\nGuardala en la pantalla de inicio y mostrá el QR al pagar para sumar puntos. Si pedís desde la web con este celular, también suman.`;
 
 function vistaClub() {
@@ -1032,7 +1033,7 @@ function abrirNuevoSocio() {
     ev.preventDefault();
     const v = n => f.elements[n].value;
     const cumple = v('cumple').trim();
-    if (cumple && !deCumple(cumple)) { $('[data-err]').textContent = 'El cumpleaños va como DD/MM (por ejemplo 15/03).'; return; }
+    if (cumple && !deCumple(cumple)) { $('[data-err]').textContent = 'El cumpleaños va como DD/MM (por ejemplo 15/03 o 1503).'; return; }
     try {
       const r = await post('/api/admin/socios', { nombre: v('nombre'), tel: v('tel'), email: v('email'), cumple: deCumple(cumple), nota: v('nota') });
       avisar('Socio Nº ' + r.socio.numeroTxt + ' creado');
@@ -1532,7 +1533,7 @@ document.addEventListener('submit', ev => {
   if (f.matches('[data-sm-datos]')) {
     ev.preventDefault();
     const v = n => f.elements[n].value, cumple = v('cumple').trim();
-    if (cumple && !deCumple(cumple)) { $('[data-sm-err2]').textContent = 'El cumpleaños va como DD/MM (por ejemplo 15/03).'; return; }
+    if (cumple && !deCumple(cumple)) { $('[data-sm-err2]').textContent = 'El cumpleaños va como DD/MM (por ejemplo 15/03 o 1503).'; return; }
     editarSocio({ nombre: v('nombre'), tel: v('tel'), email: v('email'), cumple: deCumple(cumple), nota: v('nota') }, 'Datos guardados');
   }
 });

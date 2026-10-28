@@ -110,6 +110,8 @@ Qué hay y cómo funciona:
   QR o buscando por número).
 - Arriba de todo, en la barra roja, está el botón **★ SOCIOS** (va a `/club/`, o a la credencial
   si ya se abrió en ese celular).
+- **Cumpleaños**: en el alta desde la web se elige con dos listas (día y mes), porque el teclado
+  numérico del celular no tiene "/". En el panel se puede escribir 15/03, 15-03 o 1503.
 - **Premios y beneficios**: se editan en el panel (Club → Premios y reglas). Por defecto,
   1 punto cada $1.000. Los canjes los hace el local desde la ficha del socio.
 

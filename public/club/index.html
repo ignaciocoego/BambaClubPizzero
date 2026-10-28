@@ -170,6 +170,11 @@ a{color:inherit}
 .form-club{display:flex;flex-direction:column;gap:9px}
 .dato{width:100%;font:inherit;font-size:16px;border:1.5px solid var(--linea);border-radius:12px;padding:13px 14px;background:var(--papel);color:var(--tinta)}
 .dato:focus{outline:none;border-color:var(--azul)}
+.cumple{border:0;padding:0;margin:0;min-width:0;display:grid;grid-template-columns:1fr 1.6fr;gap:9px}
+.cumple legend{grid-column:1/-1;padding:0;margin-bottom:6px;font-size:13px;font-weight:700;color:var(--gris)}
+.cumple legend small{font-weight:500}
+.cumple select{-webkit-appearance:none;appearance:none;padding-right:34px;
+  background:var(--papel) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%236E5C55' stroke-width='2'/%3E%3C/svg%3E") no-repeat right 14px center}
 .error{color:var(--rojo);font-size:13px;font-weight:700;min-height:0}
 .error:empty{display:none}
 .nota-club{font-size:12.5px;color:var(--gris);text-align:center}
@@ -205,6 +210,8 @@ const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
 const plata = n => '$ ' + Number(n || 0).toLocaleString('es-AR');
 const MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+const MESES_LARGO = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+const DIAS_MES = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 const fecha = ts => { const d = new Date(ts - 3 * 3600 * 1000); return d.getUTCDate() + ' ' + MESES[d.getUTCMonth()] + ' ' + d.getUTCFullYear(); };
 const fechaHora = ts => { const d = new Date(ts - 3 * 3600 * 1000); return d.getUTCDate() + '/' + (d.getUTCMonth() + 1) + ' ' + String(d.getUTCHours()).padStart(2, '0') + ':' + String(d.getUTCMinutes()).padStart(2, '0'); };
 const leer = k => { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } };
@@ -493,7 +500,11 @@ function pintarPortada(info) {
       <form class="form-club" data-form-alta>
         <input class="dato" name="nombre" placeholder="Nombre y apellido" autocomplete="name" required maxlength="60">
         <input class="dato" name="tel" type="tel" inputmode="tel" placeholder="Teléfono (WhatsApp)" autocomplete="tel" required>
-        <input class="dato" name="cumple" inputmode="numeric" placeholder="Cumpleaños DD/MM (opcional)" maxlength="5">
+        <fieldset class="cumple">
+          <legend>Cumpleaños <small>(opcional)</small></legend>
+          <select class="dato" name="cumpleDia" aria-label="Día de tu cumpleaños"><option value="">Día</option>${Array.from({ length: 31 }, (_, i) => `<option value="${i + 1}">${i + 1}</option>`).join('')}</select>
+          <select class="dato" name="cumpleMes" aria-label="Mes de tu cumpleaños"><option value="">Mes</option>${MESES_LARGO.map((m, i) => `<option value="${i + 1}">${m}</option>`).join('')}</select>
+        </fieldset>
         <p class="error" data-club-error></p>
         <button class="btn btn--rojo" type="submit">Hacerme socio</button>
         <p class="nota-club">Es gratis. Al toque tenés tu credencial con QR.</p>
@@ -526,9 +537,11 @@ async function enviarClub(f) {
   err.textContent = '';
   let cuerpo, ruta;
   if (f.matches('[data-form-alta]')) {
-    const c = v('cumple'), m = /^(\d{1,2})\/(\d{1,2})$/.exec(c);
-    if (c && !(m && +m[1] >= 1 && +m[1] <= 31 && +m[2] >= 1 && +m[2] <= 12)) { err.textContent = 'El cumpleaños va como DD/MM (por ejemplo 15/03).'; return; }
-    ruta = '/api/club/alta'; cuerpo = { nombre: v('nombre'), tel: v('tel'), cumple: m ? String(m[2]).padStart(2, '0') + '-' + String(m[1]).padStart(2, '0') : '' };
+    // el cumpleaños va con dos listas: el teclado numérico del celular no tiene "/" para escribir DD/MM
+    const dia = +v('cumpleDia'), mes = +v('cumpleMes');
+    if (!dia !== !mes) { err.textContent = 'Elegí el día y el mes de tu cumpleaños (o ninguno de los dos).'; return; }
+    if (dia > DIAS_MES[mes - 1]) { err.textContent = MESES_LARGO[mes - 1] + ' no tiene ' + dia + ' días.'; return; }
+    ruta = '/api/club/alta'; cuerpo = { nombre: v('nombre'), tel: v('tel'), cumple: dia ? String(mes).padStart(2, '0') + '-' + String(dia).padStart(2, '0') : '' };
   } else { ruta = '/api/club/entrar'; cuerpo = { tel: v('tel'), numero: v('numero') }; }
   btn.disabled = true;
   try {
