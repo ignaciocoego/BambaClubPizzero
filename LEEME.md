@@ -108,6 +108,8 @@ Qué hay y cómo funciona:
   "como socio" (o "como invitado", si el cliente lo elige) y **suman cuando el local los
   marca Entregado**. Las compras en el local se cargan en la ficha del socio (escaneando el
   QR o buscando por número).
+- Arriba de todo, en la barra roja, está el botón **★ SOCIOS** (va a `/club/`, o a la credencial
+  si ya se abrió en ese celular).
 - **Premios y beneficios**: se editan en el panel (Club → Premios y reglas). Por defecto,
   1 punto cada $1.000. Los canjes los hace el local desde la ficha del socio.
 

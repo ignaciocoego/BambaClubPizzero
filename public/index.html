@@ -153,10 +153,12 @@ a{color:var(--rojo);text-decoration:none}
 /* ---------- header ---------- */
 .top{
   position:sticky;top:0;z-index:40;background:var(--rojo);
-  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  display:flex;align-items:center;justify-content:space-between;gap:8px;
   padding:0 14px;height:58px;border-bottom:3px solid var(--rojo-osc);
 }
-.top__logo{display:block;width:88px;color:var(--crema)}
+.top__logo{display:block;width:88px;color:var(--crema);margin-right:auto}
+.top__socios{flex:none;border:1.5px solid rgba(255,251,243,.6);border-radius:999px;padding:8px 12px;
+  font-size:12px;font-weight:800;letter-spacing:.08em;color:var(--crema);white-space:nowrap}
 .top__cart{
   display:flex;align-items:center;gap:8px;background:var(--papel);
   border-radius:999px;padding:9px 13px;font-size:12px;font-weight:800;
@@ -571,6 +573,7 @@ body.splash-activo{overflow:hidden}
 
   <header class="top">
     <a class="top__logo marca" href="#top" aria-label="Bamba Club Pizzero, inicio"></a>
+    <a class="top__socios" href="/club/" data-top-socios>★ SOCIOS</a>
     <button class="top__cart" data-abrir-pedido aria-label="Ver mi pedido">
       <span>PEDIDO</span>
       <span class="top__count" data-count>0</span>
@@ -1360,6 +1363,7 @@ async function iniciarClub() {
     $('[data-club-acc]').innerHTML = `<a class="c1" href="/club/${encodeURIComponent(socio.token)}/">Ver mi credencial</a><a class="c2" href="#carta">Pedir y sumar</a>`;
     const h = $('[data-hero-club]');
     if (h) { h.href = '/club/' + encodeURIComponent(socio.token) + '/'; h.textContent = '★ Socio Nº ' + socio.numeroTxt + ' · Ver mi credencial'; }
+    $('[data-top-socios]').href = '/club/' + encodeURIComponent(socio.token) + '/';
   }
   if (!/^https?:$/.test(location.protocol)) return;
   try {
