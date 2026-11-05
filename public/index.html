@@ -1742,14 +1742,14 @@ function pintarHoras() {
 /* Fondo del plano: la vereda sin techo, el deck techado (recuadro amarillo y toldo rojo) y el salón de adentro (recuadro blanco, con puerta).
    Qué mesa cae en cada zona sale de su lugar en el plano. */
 const adentro = m => m.x < 66.5 && m.y > 100.5;
-const enDeck = m => m.x < 66.5 && m.y < 71.5;
+const enDeck = m => m.x < 69.25 && m.y < 71.5;
 function fondoPlano() {
-  const escamas = 'q-3.25 3.6-6.5 0'.repeat(10);
+  const escamas = 'q-3.125 3.6-6.25 0'.repeat(11);
   return `
     <defs>
       <pattern id="baldosa" width="9" height="9" patternUnits="userSpaceOnUse"><path d="M9 0H0V9" fill="none" stroke="#FFFBF3" stroke-opacity=".1" stroke-width=".35"/></pattern>
       <pattern id="tablon" width="8" height="3.4" patternUnits="userSpaceOnUse"><path d="M0 3.4H8" stroke="#FFFBF3" stroke-opacity=".07" stroke-width=".3"/></pattern>
-      <pattern id="toldoRayas" width="13" height="6" patternUnits="userSpaceOnUse" patternTransform="translate(1.5 0)"><rect width="6.5" height="6" fill="#000" fill-opacity=".14"/></pattern>
+      <pattern id="toldoRayas" width="12.5" height="6" patternUnits="userSpaceOnUse" patternTransform="translate(.5 0)"><rect width="6.25" height="6" fill="#000" fill-opacity=".14"/></pattern>
     </defs>
 
     <rect x="0" y="-8" width="108" height="8" fill="#0A1A3D"/>
@@ -1760,14 +1760,14 @@ function fondoPlano() {
     <text class="s-calle" x="104" y="68" transform="rotate(90 104 68)" dy="-.6">MONSEÑOR PIAGGIO</text>
     <rect x="0" y="0" width="100" height="136" fill="#1A3F8F"/>
     <rect x="0" y="0" width="100" height="136" fill="url(#baldosa)"/>
-    <path class="s-recuadro" d="M1.5 3V71.5H66.5V3"/>
-    <path d="M1.5 0H66.5V3.4${escamas}Z" fill="#A2241F"/>
-    <path d="M1.5 0H66.5V3.4${escamas}Z" fill="url(#toldoRayas)"/>
-    <g class="s-zona s-zona--deck"><rect x="14.3" y="7.8" width="39.4" height="5.6" rx="2.8"/><text x="34" y="11.7">DECK · TECHADO</text></g>
+    <path class="s-recuadro" d="M.5 3V71.5H69.25V3"/>
+    <path d="M.5 0H69.25V3.4${escamas}Z" fill="#A2241F"/>
+    <path d="M.5 0H69.25V3.4${escamas}Z" fill="url(#toldoRayas)"/>
+    <g class="s-zona s-zona--deck"><rect x="20.3" y="7.8" width="39.4" height="5.6" rx="2.8"/><text x="40" y="11.7">DECK · TECHADO</text></g>
     <g class="s-zona s-zona--afuera"><rect x="75" y="81.5" width="22" height="9" rx="2.8"/><text x="86" y="85.4">AFUERA</text><text class="s-zona__sub" x="86" y="88.6">SIN TECHO</text></g>
-    <rect x="1.5" y="100.5" width="65" height="33.5" fill="#0A1B46"/>
-    <rect x="1.5" y="100.5" width="65" height="33.5" fill="url(#tablon)"/>
-    <path d="M36 100.5H1.5V134H66.5V100.5H49" fill="none" stroke="#FFFBF3" stroke-width="1" stroke-linejoin="round"/>
+    <rect x=".5" y="100.5" width="66" height="33.5" fill="#0A1B46"/>
+    <rect x=".5" y="100.5" width="66" height="33.5" fill="url(#tablon)"/>
+    <path d="M36 100.5H.5V134H66.5V100.5H49" fill="none" stroke="#FFFBF3" stroke-width="1" stroke-linejoin="round"/>
     <path d="M36 100.5H49" stroke="#FFFBF3" stroke-opacity=".6" stroke-width=".7" stroke-dasharray=".9 .9"/>
     <g class="s-zona s-zona--adentro"><rect x="36.5" y="103" width="25" height="5.6" rx="2.8"/><text x="49" y="106.9">ADENTRO</text></g>
     <g class="s-horno">
