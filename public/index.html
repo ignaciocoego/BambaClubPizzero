@@ -283,7 +283,15 @@ a{color:var(--rojo);text-decoration:none}
 .sala__vacio{padding:40px 10px;text-align:center;font-size:13px;color:#A9B7E4}
 .s-barra rect{fill:#0B2358;stroke:#7E92C8;stroke-width:.5}
 .s-barra text{font-family:var(--texto);font-weight:800;font-size:2.6px;letter-spacing:.4em;fill:#C9D3F0;text-anchor:middle}
-.s-zona{font-family:var(--texto);font-weight:800;font-size:2.3px;letter-spacing:.35em;fill:#FFFBF3;opacity:.78;text-anchor:middle}
+.s-zona text{font-family:var(--texto);font-weight:800;font-size:3px;letter-spacing:.22em;text-anchor:middle}
+.s-zona .s-zona__sub{font-size:2.2px;letter-spacing:.14em}
+.s-zona--deck rect{fill:#FFD24A}
+.s-zona--deck text{fill:#0E1E45}
+.s-zona--afuera rect{fill:#0E1E45}
+.s-zona--afuera text{fill:#FFFBF3}
+.s-zona--adentro rect{fill:#FFFBF3}
+.s-zona--adentro text{fill:#0E1E45}
+.s-recuadro{fill:none;stroke:#FFD24A;stroke-width:1;stroke-linejoin:round}
 .s-horno path{fill:#7D0601;stroke:#FFFBF3;stroke-opacity:.7;stroke-width:.5}
 .s-horno .s-boca{fill:#1A0805;stroke:none}
 .s-horno text{font-family:var(--texto);font-weight:800;font-size:2.1px;letter-spacing:.3em;fill:#FFFBF3;text-anchor:middle}
@@ -1677,7 +1685,7 @@ const idsGrupo = g => g.map(m => m.id).sort((a, b) => a.localeCompare(b, 'es', {
 const libresEn = t => RES.cfg.mesas.filter(m => armarGrupo(m, t, false)).length;
 const txtMesas = s => { const a = String(s).split(','); return a.length > 1 ? 'mesas ' + a.slice(0, -1).join(', ') + ' y ' + a[a.length - 1] : 'mesa ' + a[0]; };
 const zonaMesas = s => {
-  const z = [...new Set(String(s).split(',').map(id => RES.cfg.mesas.find(x => x.id === id)).filter(Boolean).map(m => adentro(m) ? 'Adentro' : 'Afuera, en el deck'))];
+  const z = [...new Set(String(s).split(',').map(id => RES.cfg.mesas.find(x => x.id === id)).filter(Boolean).map(m => adentro(m) ? 'Adentro' : enDeck(m) ? 'En el deck, techado' : 'Afuera, sin techo'))];
   return z.join(' y ');
 };
 const ocupadasN = t => RES.cfg.mesas.filter(m => ocupadaEn(m.id, t)).length;
@@ -1731,15 +1739,17 @@ function pintarHoras() {
 }
 
 /* ---------- plano ---------- */
-/* Fondo del plano: el deck de la vereda (toldo rojo, baldosas) y el salón de adentro (piso de madera, con puerta). */
+/* Fondo del plano: la vereda sin techo, el deck techado (recuadro amarillo y toldo rojo) y el salón de adentro (recuadro blanco, con puerta).
+   Qué mesa cae en cada zona sale de su lugar en el plano. */
 const adentro = m => m.x < 66.5 && m.y > 100.5;
+const enDeck = m => m.x < 66.5 && m.y < 71.5;
 function fondoPlano() {
-  const escamas = 'q-3.125 3.6-6.25 0'.repeat(16);
+  const escamas = 'q-3.25 3.6-6.5 0'.repeat(10);
   return `
     <defs>
       <pattern id="baldosa" width="9" height="9" patternUnits="userSpaceOnUse"><path d="M9 0H0V9" fill="none" stroke="#FFFBF3" stroke-opacity=".1" stroke-width=".35"/></pattern>
       <pattern id="tablon" width="8" height="3.4" patternUnits="userSpaceOnUse"><path d="M0 3.4H8" stroke="#FFFBF3" stroke-opacity=".07" stroke-width=".3"/></pattern>
-      <pattern id="toldoRayas" width="12.5" height="6" patternUnits="userSpaceOnUse"><rect width="6.25" height="6" fill="#000" fill-opacity=".14"/></pattern>
+      <pattern id="toldoRayas" width="13" height="6" patternUnits="userSpaceOnUse" patternTransform="translate(1.5 0)"><rect width="6.5" height="6" fill="#000" fill-opacity=".14"/></pattern>
     </defs>
 
     <rect x="0" y="-8" width="108" height="8" fill="#0A1A3D"/>
@@ -1748,16 +1758,18 @@ function fondoPlano() {
     <path d="M104 0V136" stroke="#FFFBF3" stroke-opacity=".28" stroke-width=".35" stroke-dasharray="2.4 1.8"/>
     <text class="s-calle" x="50" y="-4.9">SAN MARTÍN</text>
     <text class="s-calle" x="104" y="68" transform="rotate(90 104 68)" dy="-.6">MONSEÑOR PIAGGIO</text>
-    <rect x="0" y="4" width="100" height="132" fill="#1A3F8F"/>
-    <rect x="0" y="4" width="100" height="132" fill="url(#baldosa)"/>
-    <path d="M0 0H100V3.4${escamas}Z" fill="#A2241F"/>
-    <path d="M0 0H100V3.4${escamas}Z" fill="url(#toldoRayas)"/>
-    <text class="s-zona" x="50" y="12.2">AFUERA · DECK</text>
-    <rect x="3" y="100.5" width="63.5" height="33.5" fill="#0A1B46"/>
-    <rect x="3" y="100.5" width="63.5" height="33.5" fill="url(#tablon)"/>
-    <path d="M36 100.5H3V134H66.5V100.5H49" fill="none" stroke="#FFFBF3" stroke-opacity=".85" stroke-width="1.1" stroke-linejoin="round"/>
-    <path d="M36 100.5H49" stroke="#FFFBF3" stroke-opacity=".5" stroke-width=".7" stroke-dasharray=".9 .9"/>
-    <text class="s-zona" x="49" y="106.4">ADENTRO</text>
+    <rect x="0" y="0" width="100" height="136" fill="#1A3F8F"/>
+    <rect x="0" y="0" width="100" height="136" fill="url(#baldosa)"/>
+    <path class="s-recuadro" d="M1.5 3V71.5H66.5V3"/>
+    <path d="M1.5 0H66.5V3.4${escamas}Z" fill="#A2241F"/>
+    <path d="M1.5 0H66.5V3.4${escamas}Z" fill="url(#toldoRayas)"/>
+    <g class="s-zona s-zona--deck"><rect x="14.3" y="7.8" width="39.4" height="5.6" rx="2.8"/><text x="34" y="11.7">DECK · TECHADO</text></g>
+    <g class="s-zona s-zona--afuera"><rect x="75" y="81.5" width="22" height="9" rx="2.8"/><text x="86" y="85.4">AFUERA</text><text class="s-zona__sub" x="86" y="88.6">SIN TECHO</text></g>
+    <rect x="1.5" y="100.5" width="65" height="33.5" fill="#0A1B46"/>
+    <rect x="1.5" y="100.5" width="65" height="33.5" fill="url(#tablon)"/>
+    <path d="M36 100.5H1.5V134H66.5V100.5H49" fill="none" stroke="#FFFBF3" stroke-width="1" stroke-linejoin="round"/>
+    <path d="M36 100.5H49" stroke="#FFFBF3" stroke-opacity=".6" stroke-width=".7" stroke-dasharray=".9 .9"/>
+    <g class="s-zona s-zona--adentro"><rect x="36.5" y="103" width="25" height="5.6" rx="2.8"/><text x="49" y="106.9">ADENTRO</text></g>
     <g class="s-horno">
       <path d="M34 132.6V128.6Q34 122 47 122Q60 122 60 128.6V132.6Z"/>
       <path class="s-boca" d="M41.5 132.6V129.4Q41.5 126.4 47 126.4Q52.5 126.4 52.5 129.4V132.6Z"/>
